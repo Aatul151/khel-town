@@ -3,14 +3,14 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, PerspectiveCamera } from "@react-three/drei";
 import * as THREE from "three";
 import { AlphabetGrid } from "../components/AlphabetGrid";
-import { StarReward } from "../components/StarReward";
-import { ObjectModel } from "../components/ObjectModel";
-import { Avatar3D } from "../components/Avatar3D";
-import { LearningItem } from "../data/types";
-import { AvatarType } from "../components/AvatarSelector";
-import { useAvatarControls } from "../hooks/useAvatarControls";
-import { useIsMobile } from "../hooks/useIsMobile";
-import { playWalkingSound, stopWalkingSound } from "../utils/audio";
+import { StarReward } from "../../../../components/StarReward";
+import { ObjectModel } from "../../../../components/ObjectModel";
+import { Avatar3D } from "../../../../components/Avatar3D";
+import { LearningItem } from "../../../../data/types";
+import { AvatarType } from "../../../../components/AvatarSelector";
+import { useAvatarControls } from "../../../../hooks/useAvatarControls";
+import { useIsMobile } from "../../../../hooks/useIsMobile";
+import { playWalkingSound, stopWalkingSound } from "../../../../utils/audio";
 
 interface AlphabetStreetProps {
   items: LearningItem[];

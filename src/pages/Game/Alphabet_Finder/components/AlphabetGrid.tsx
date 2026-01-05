@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Text } from "@react-three/drei";
-import { LearningItem } from "../data/types";
+import { LearningItem } from "../../../../data/types";
 
 interface AlphabetGridProps {
   items: LearningItem[];
@@ -278,4 +278,3 @@ function AlphabetBox({ item, position, onClick, avatarPosition, isCompleted = fa
     </group>
   );
 }
-

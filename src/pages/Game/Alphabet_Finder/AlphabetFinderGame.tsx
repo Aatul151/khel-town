@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { AlphabetStreet } from "../../../scenes/AlphabetStreet";
+import { AlphabetStreet } from "./scenes/AlphabetStreet";
 import { HUD } from "../../../ui/HUD";
-import { PromptDisplay } from "../../../components/PromptDisplay";
+import { PromptDisplay } from "./components/PromptDisplay";
 import { LearningItem, LearningMode } from "../../../data/types";
 import { getContentForMode } from "../../../data/index";
 import { getProgress, addStar, markItemComplete, resetProgress } from "../../../utils/storage";

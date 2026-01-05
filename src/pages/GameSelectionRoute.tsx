@@ -19,6 +19,9 @@ export function GameSelectionRoute() {
     const alphabetCompleted = alphabetContent.length > 0 &&
       alphabetProgress.completedItems.length >= alphabetContent.length;
 
+    // Letter Match game completion (simplified - can be enhanced with proper tracking)
+    const letterMatchCompleted = false; // Can be enhanced with proper game completion tracking
+
     return [
       {
         id: "alphabet-finder",
@@ -27,6 +30,14 @@ export function GameSelectionRoute() {
         emoji: "🔤",
         color: "#3b82f6",
         completed: alphabetCompleted,
+      },
+      {
+        id: "letter-match",
+        name: "Letter Match",
+        description: "Match uppercase and lowercase letters",
+        emoji: "🔗",
+        color: "#10b981",
+        completed: letterMatchCompleted,
       },
     ];
   };
