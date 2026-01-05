@@ -325,9 +325,9 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
                   e?.stopPropagation();
                   handleTouchEnd("up");
                 }}
-                onMouseDown={() => handleTouchStart("up")}
-                onMouseUp={() => handleTouchEnd("up")}
-                onMouseLeave={() => handleTouchEnd("up")}
+                // onMouseDown={() => handleTouchStart("up")}
+                // onMouseUp={() => handleTouchEnd("up")}
+                // onMouseLeave={() => handleTouchEnd("up")}
                 className="bg-blue-500 active:bg-blue-600 text-white rounded-lg p-3 shadow-lg touch-manipulation select-none"
                 aria-label="Move Forward"
               >
@@ -346,9 +346,9 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
                   e.stopPropagation();
                   handleTouchEnd("left");
                 }}
-                onMouseDown={() => handleTouchStart("left")}
-                onMouseUp={() => handleTouchEnd("left")}
-                onMouseLeave={() => handleTouchEnd("left")}
+                // onMouseDown={() => handleTouchStart("left")}
+                // onMouseUp={() => handleTouchEnd("left")}
+                // onMouseLeave={() => handleTouchEnd("left")}
                 className="bg-blue-500 active:bg-blue-600 text-white rounded-lg p-3 shadow-lg touch-manipulation select-none"
                 aria-label="Turn Left"
               >
@@ -365,9 +365,9 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
                   e.stopPropagation();
                   handleTouchEnd("down");
                 }}
-                onMouseDown={() => handleTouchStart("down")}
-                onMouseUp={() => handleTouchEnd("down")}
-                onMouseLeave={() => handleTouchEnd("down")}
+                // onMouseDown={() => handleTouchStart("down")}
+                // onMouseUp={() => handleTouchEnd("down")}
+                // onMouseLeave={() => handleTouchEnd("down")}
                 className="bg-blue-500 active:bg-blue-600 text-white rounded-lg p-3 shadow-lg touch-manipulation select-none"
                 aria-label="Turn Around"
               >
@@ -384,9 +384,9 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
                   e.stopPropagation();
                   handleTouchEnd("right");
                 }}
-                onMouseDown={() => handleTouchStart("right")}
-                onMouseUp={() => handleTouchEnd("right")}
-                onMouseLeave={() => handleTouchEnd("right")}
+                // onMouseDown={() => handleTouchStart("right")}
+                // onMouseUp={() => handleTouchEnd("right")}
+                // onMouseLeave={() => handleTouchEnd("right")}
                 className="bg-blue-500 active:bg-blue-600 text-white rounded-lg p-3 shadow-lg touch-manipulation select-none"
                 aria-label="Turn Right"
               >
