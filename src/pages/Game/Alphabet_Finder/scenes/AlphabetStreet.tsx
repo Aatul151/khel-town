@@ -36,6 +36,8 @@ interface AlphabetStreetProps {
   direction?: "up" | "down" | "left" | "right" | null;
   rotationDirection?: "left" | "right" | "down" | null;
   isMoving?: boolean;
+  // Optional touch gesture handlers (for external control integration)
+  onTouchGesture?: (action: "up" | "down" | "left" | "right") => void;
 }
 
 export function AlphabetStreet({
@@ -61,6 +63,7 @@ export function AlphabetStreet({
   direction: externalDirection = null,
   rotationDirection: externalRotationDirection = null,
   isMoving: externalIsMoving = false,
+  onTouchGesture,
 }: AlphabetStreetProps) {
   // Navigation management - use external controls if provided, otherwise use internal hook
   const internalControls = useAvatarControls();
@@ -73,6 +76,14 @@ export function AlphabetStreet({
   const [internalAvatarPosition, setInternalAvatarPosition] = useState<[number, number, number]>(initialAvatarPosition);
   const [internalAvatarRotation, setInternalAvatarRotation] = useState<number>(0);
   const [internalIsAvatarMoving, setInternalIsAvatarMoving] = useState(false);
+
+  // Touch gesture state for swipe detection
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null);
+  const touchStartTime = useRef<number>(0);
+  const isGestureActive = useRef<boolean>(false);
+  const gestureDirection = useRef<"up" | "down" | "left" | "right" | null>(null);
+  const isTouchHolding = useRef<boolean>(false);
+  const touchHoldInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Use internal state for avatar position and rotation
   const avatarPosition = internalAvatarPosition;
@@ -219,6 +230,234 @@ export function AlphabetStreet({
     setInternalAvatarPosition([0, 0, -20]);
     setInternalAvatarRotation(0);
   }, [shuffleKey]);
+
+  // Touch gesture handlers for mobile swipe navigation
+  // Touch and hold = continuous forward movement
+  // Quick swipe left/right = change direction
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const stopForwardMovement = () => {
+      if (touchHoldInterval.current) {
+        clearInterval(touchHoldInterval.current);
+        touchHoldInterval.current = null;
+      }
+      
+      if (isTouchHolding.current) {
+        isTouchHolding.current = false;
+        
+        // Stop movement
+        if (onTouchGesture) {
+          // For external controls, we'll handle stopping via the parent's touch end
+          // The parent component should handle this
+        } else if (internalControls.handleTouchEnd && externalDirection === null) {
+          internalControls.handleTouchEnd("up");
+        } else {
+          setInternalIsAvatarMoving(false);
+        }
+      }
+    };
+
+    const startForwardMovement = () => {
+      if (isTouchHolding.current) return; // Already moving
+      
+      isTouchHolding.current = true;
+      
+      if (onTouchGesture) {
+        // Use callback - parent will handle continuous movement
+        onTouchGesture("up");
+      } else if (internalControls.handleTouchStart && externalDirection === null) {
+        internalControls.handleTouchStart("up");
+      } else {
+        setInternalIsAvatarMoving(true);
+      }
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      // Don't interfere with UI button touches or if touching a clickable element
+      const target = e.target as HTMLElement;
+      if (target.closest('button') || target.closest('a') || target.closest('[role="button"]')) {
+        return;
+      }
+
+      const touch = e.touches[0];
+      if (touch) {
+        touchStartPos.current = { x: touch.clientX, y: touch.clientY };
+        touchStartTime.current = Date.now();
+        isGestureActive.current = true;
+        gestureDirection.current = null;
+        isTouchHolding.current = false;
+        
+        // Start a timer to detect touch and hold (for forward movement)
+        // If user holds for more than 150ms without significant movement, start moving forward
+        setTimeout(() => {
+          if (isGestureActive.current && !gestureDirection.current) {
+            // No significant swipe detected, treat as touch and hold
+            startForwardMovement();
+          }
+        }, 150);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isGestureActive.current || !touchStartPos.current) return;
+
+      const touch = e.touches[0];
+      if (!touch) return;
+
+      const deltaX = touch.clientX - touchStartPos.current.x;
+      const deltaY = touch.clientY - touchStartPos.current.y;
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+      // Minimum swipe distance (in pixels) to register as a swipe gesture
+      const minSwipeDistance = 40;
+
+      if (distance > minSwipeDistance) {
+        // Stop forward movement if we detect a swipe
+        stopForwardMovement();
+        
+        // Determine swipe direction based on which axis has more movement
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          // Horizontal swipe - change direction immediately
+          gestureDirection.current = deltaX > 0 ? "right" : "left";
+          
+          // Handle direction change immediately
+          const swipeDirection = gestureDirection.current;
+          if (swipeDirection === "left") {
+            // Turn left (90 degrees clockwise)
+            if (onTouchGesture) {
+              onTouchGesture("left");
+            } else if (internalControls.handleTouchStart && externalRotationDirection === null) {
+              internalControls.handleTouchStart("left");
+              setTimeout(() => {
+                if (internalControls.handleTouchEnd) {
+                  internalControls.handleTouchEnd("left");
+                }
+              }, 50);
+            } else {
+              setInternalAvatarRotation(prev => {
+                const normalized = ((prev % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+                return normalized + Math.PI / 2;
+              });
+            }
+          } else if (swipeDirection === "right") {
+            // Turn right (90 degrees counter-clockwise)
+            if (onTouchGesture) {
+              onTouchGesture("right");
+            } else if (internalControls.handleTouchStart && externalRotationDirection === null) {
+              internalControls.handleTouchStart("right");
+              setTimeout(() => {
+                if (internalControls.handleTouchEnd) {
+                  internalControls.handleTouchEnd("right");
+                }
+              }, 50);
+            } else {
+              setInternalAvatarRotation(prev => {
+                const normalized = ((prev % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+                return normalized - Math.PI / 2;
+              });
+            }
+          }
+        } else {
+          // Vertical swipe
+          if (deltaY < 0) {
+            // Swipe up - could be forward movement, but we'll handle it on touch end
+            gestureDirection.current = "up";
+          } else {
+            // Swipe down - turn around
+            gestureDirection.current = "down";
+            if (onTouchGesture) {
+              onTouchGesture("down");
+            } else if (internalControls.handleTouchStart && externalRotationDirection === null) {
+              internalControls.handleTouchStart("down");
+              setTimeout(() => {
+                if (internalControls.handleTouchEnd) {
+                  internalControls.handleTouchEnd("down");
+                }
+              }, 50);
+            } else {
+              setInternalAvatarRotation(prev => {
+                const normalized = ((prev % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+                return normalized + Math.PI;
+              });
+            }
+          }
+        }
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!isGestureActive.current) return;
+
+      const touchTime = Date.now() - touchStartTime.current;
+      const wasHolding = isTouchHolding.current;
+
+      // Stop forward movement if it was active (touch and hold)
+      if (wasHolding) {
+        stopForwardMovement();
+        // If using callback, we need to notify parent to stop movement
+        // The parent component should handle stopping via handleTouchEnd
+        if (onTouchGesture && externalDirection !== null) {
+          // Movement is controlled externally, parent will handle stop
+          // We'll rely on the parent's touch end handling
+        }
+      }
+
+      const maxSwipeTime = 300; // Maximum time for a quick swipe gesture (ms)
+
+      // If it was a quick swipe up (not touch and hold), trigger a short forward movement
+      if (!wasHolding && touchTime < maxSwipeTime && gestureDirection.current === "up") {
+        e.preventDefault();
+        if (onTouchGesture) {
+          onTouchGesture("up");
+          setTimeout(() => {
+            // Stop after short movement - parent should handle this
+            if (internalControls.handleTouchEnd && externalDirection === null) {
+              internalControls.handleTouchEnd("up");
+            }
+          }, 200);
+        } else if (internalControls.handleTouchStart && externalDirection === null) {
+          internalControls.handleTouchStart("up");
+          setTimeout(() => {
+            if (internalControls.handleTouchEnd) {
+              internalControls.handleTouchEnd("up");
+            }
+          }, 200);
+        } else {
+          setInternalIsAvatarMoving(true);
+          setTimeout(() => {
+            setInternalIsAvatarMoving(false);
+          }, 200);
+        }
+      }
+
+      // Reset gesture state
+      touchStartPos.current = null;
+      isGestureActive.current = false;
+      gestureDirection.current = null;
+    };
+
+    const handleTouchCancel = () => {
+      stopForwardMovement();
+      touchStartPos.current = null;
+      isGestureActive.current = false;
+      gestureDirection.current = null;
+    };
+
+    // Add event listeners to the window (will work on the canvas area)
+    window.addEventListener('touchstart', handleTouchStart, { passive: false });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: false });
+    window.addEventListener('touchcancel', handleTouchCancel, { passive: true });
+
+    return () => {
+      stopForwardMovement();
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('touchcancel', handleTouchCancel);
+    };
+  }, [isMobile, internalControls, onTouchGesture, externalDirection, externalRotationDirection]);
 
 
   // Camera controller component that follows avatar

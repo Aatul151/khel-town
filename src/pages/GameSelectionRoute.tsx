@@ -39,6 +39,14 @@ export function GameSelectionRoute() {
         color: "#10b981",
         completed: letterMatchCompleted,
       },
+      {
+        id: "obstacle-dodge",
+        name: "Obstacle Dodge",
+        description: "Dodge obstacles and survive as long as possible",
+        emoji: "🏃",
+        color: "#f59e0b",
+        completed: false,
+      },
     ];
   };
 

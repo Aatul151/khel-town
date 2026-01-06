@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AlphabetStreet } from "./scenes/AlphabetStreet";
 import { HUD } from "../../../ui/HUD";
 import { PromptDisplay } from "./components/PromptDisplay";
@@ -178,6 +178,73 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
     onBack();
   };
 
+  // Handle touch gestures from swipe controls
+  // For "up" (forward), we'll handle continuous movement in the scene component
+  // For left/right/down, these are quick direction changes
+  const touchGestureRef = useRef<{ 
+    action: "up" | "down" | "left" | "right" | null; 
+    timeout: ReturnType<typeof setTimeout> | null;
+    isHolding: boolean;
+  }>({ action: null, timeout: null, isHolding: false });
+  
+  const handleTouchGesture = useCallback((action: "up" | "down" | "left" | "right") => {
+    // Clear any existing timeout
+    if (touchGestureRef.current.timeout) {
+      clearTimeout(touchGestureRef.current.timeout);
+      touchGestureRef.current.timeout = null;
+    }
+
+    // Stop previous action if switching
+    if (touchGestureRef.current.action && touchGestureRef.current.action !== action) {
+      if (touchGestureRef.current.action === "up" && touchGestureRef.current.isHolding) {
+        handleTouchEnd("up");
+        touchGestureRef.current.isHolding = false;
+      }
+    }
+
+    if (action === "up") {
+      // Start forward movement - will continue until touch ends
+      handleTouchStart("up");
+      touchGestureRef.current.action = "up";
+      touchGestureRef.current.isHolding = true;
+    } else {
+      // Quick direction change
+      handleTouchStart(action);
+      touchGestureRef.current.action = action;
+      touchGestureRef.current.isHolding = false;
+      touchGestureRef.current.timeout = setTimeout(() => {
+        handleTouchEnd(action);
+        touchGestureRef.current.action = null;
+      }, 50);
+    }
+  }, [handleTouchStart, handleTouchEnd]);
+
+  // Handle touch end to stop forward movement
+  useEffect(() => {
+    const handleTouchEndGlobal = () => {
+      if (touchGestureRef.current.action === "up" && touchGestureRef.current.isHolding) {
+        handleTouchEnd("up");
+        touchGestureRef.current.isHolding = false;
+        touchGestureRef.current.action = null;
+      }
+    };
+
+    // Listen for touch end events on the window
+    window.addEventListener('touchend', handleTouchEndGlobal, { passive: true });
+    window.addEventListener('touchcancel', handleTouchEndGlobal, { passive: true });
+
+    return () => {
+      window.removeEventListener('touchend', handleTouchEndGlobal);
+      window.removeEventListener('touchcancel', handleTouchEndGlobal);
+      if (touchGestureRef.current.timeout) {
+        clearTimeout(touchGestureRef.current.timeout);
+      }
+      if (touchGestureRef.current.action === "up" && touchGestureRef.current.isHolding) {
+        handleTouchEnd("up");
+      }
+    };
+  }, [handleTouchEnd]);
+
   return (
     <div className="w-full h-screen bg-gradient-to-b from-blue-100 to-purple-100 overflow-hidden">
       {/* 3D Scene */}
@@ -205,6 +272,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
           direction={direction}
           rotationDirection={rotationDirection}
           isMoving={isMoving}
+          onTouchGesture={isMobile ? handleTouchGesture : undefined}
         />
       </div>
 
@@ -300,18 +368,34 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
       {currentMode === "alphabet" && (
         <div className={`absolute ${isMobile ? 'top-16 left-2' : 'top-20 left-4'} z-20`}>
           <div className={`bg-white/90 backdrop-blur-sm rounded-lg ${isMobile ? 'px-2 py-1' : 'px-3 py-1.5'} shadow-lg`}>
-            <div className={`${isMobile ? 'text-[10px]' : 'text-xs'} font-medium text-gray-700`}>
-              {isMobile ? '↑↓←→ Move' : 'Arrow Keys: Move'}
-            </div>
-            <div className={`${isMobile ? 'text-[9px]' : 'text-[10px]'} text-gray-500 mt-0.5`}>
-              {isMobile ? 'Tap Box' : 'Click Box'}
-            </div>
+            {isMobile ? (
+              <>
+                <div className={`text-[10px] font-medium text-gray-700`}>
+                  Tap to move forward
+                </div>
+                <div className={`text-[9px] text-gray-500 mt-0.5`}>
+                  Swipe for direction
+                </div>
+                <div className={`text-[9px] text-gray-500 mt-0.5`}>
+                  Tap Box to select
+                </div>
+              </>
+            ) : (
+              <>
+                <div className={`text-xs font-medium text-gray-700`}>
+                  Arrow Keys: Move
+                </div>
+                <div className={`text-[10px] text-gray-500 mt-0.5`}>
+                  Click Box
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* Mobile Control Buttons */}
-      {currentMode === "alphabet" && isMobile && (
+      {/* Mobile Control Buttons - Hidden when touch gestures are enabled */}
+      {false && currentMode === "alphabet" && isMobile && (
         <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-30">
           <div className="relative">
             <div className="grid grid-cols-3 gap-0.5">
