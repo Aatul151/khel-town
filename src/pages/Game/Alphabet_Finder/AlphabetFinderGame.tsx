@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AlphabetStreet } from "./scenes/AlphabetStreet";
+import { THEME_CONFIG } from "./scenes/AlphabetStreet";
 import { HUD } from "../../../ui/HUD";
 import { PromptDisplay } from "./components/PromptDisplay";
 import { LearningItem, LearningMode } from "../../../data/types";
@@ -10,6 +11,36 @@ import { useIsMobile } from "../../../hooks/useIsMobile";
 import { useAvatarControls } from "../../../hooks/useAvatarControls";
 import { AvatarType } from "../../../components/AvatarSelector";
 import { usePlayer } from "../../../context/PlayerContext";
+
+/** Scene theme: changes each time the game starts. Boxes stay the same; only world (ground, lights, env) changes. */
+export type SceneThemeId =
+  | "sunset"
+  | "dawn"
+  | "park"
+  | "forest"
+  | "jungle"
+  | "beach"
+  | "apartment"
+  | "studio"
+  | "warehouse"
+  | "night";
+
+const SCENE_THEMES: SceneThemeId[] = [
+  "sunset",
+  "dawn",
+  "park",
+  "forest",
+  "jungle",
+  "beach",
+  "apartment",
+  "studio",
+  "warehouse",
+  "night",
+];
+
+function pickRandomTheme(): SceneThemeId {
+  return SCENE_THEMES[Math.floor(Math.random() * SCENE_THEMES.length)];
+}
 
 interface AlphabetFinderGameProps {
   avatar: AvatarType;
@@ -35,6 +66,9 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
   const [showTooFarMessage, setShowTooFarMessage] = useState(false);
   const [boxPositions, setBoxPositions] = useState<Map<string, [number, number, number]>>(new Map());
   const [shuffleKey, setShuffleKey] = useState(0);
+  const [sceneTheme, setSceneTheme] = useState<SceneThemeId>(() => pickRandomTheme());
+  const [roundNumber, setRoundNumber] = useState(1);
+  const [showRoundOverlay, setShowRoundOverlay] = useState(true);
 
   // Get current content based on mode
   const currentContent = getContentForMode(currentMode);
@@ -163,9 +197,20 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
       setShowSuccess(false);
       setPromptItem(null);
       setShuffleKey(prev => prev + 1);
+      setSceneTheme(pickRandomTheme());
+      setRoundNumber(prev => prev + 1);
+      setShowRoundOverlay(true);
       stopAllAudio();
       playBackgroundMusic();
     }
+  };
+
+  const handleChangeTheme = () => {
+    setSceneTheme(pickRandomTheme());
+  };
+
+  const handleRoundNext = () => {
+    setShowRoundOverlay(false);
   };
 
   const handleStarComplete = () => {
@@ -245,11 +290,55 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
     };
   }, [handleTouchEnd]);
 
+  // Get sky styling from theme
+  const themeSky = THEME_CONFIG[sceneTheme];
+  const skyStyle = themeSky.skyGradient
+    ? {
+        background: `linear-gradient(to bottom, ${themeSky.skyGradient.from}, ${themeSky.skyGradient.to})`,
+      }
+    : {
+        backgroundColor: themeSky.skyColor,
+      };
+
   return (
-    <div className="w-full h-screen bg-gradient-to-b from-blue-100 to-purple-100 overflow-hidden">
-      {/* 3D Scene */}
+    <div className="w-full h-screen overflow-hidden" style={skyStyle}>
+      {/* Round overlay: show round number + option to change theme, then Next */}
+      {showRoundOverlay && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className={`bg-white rounded-2xl shadow-2xl ${isMobile ? 'p-5 mx-4' : 'p-8'} max-w-sm w-full text-center`}>
+            <div className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-gray-800 mb-1`}>
+              Round {roundNumber}
+            </div>
+            <div className={`${isMobile ? 'text-sm' : 'text-base'} text-gray-500 mb-6`}>
+              Find the letters in this view
+            </div>
+            <div className="flex flex-col gap-3">
+              <button
+                type="button"
+                onClick={handleChangeTheme}
+                className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                aria-label="Change theme"
+              >
+                <span aria-hidden>🎨</span>
+                Change view
+              </button>
+              <button
+                type="button"
+                onClick={handleRoundNext}
+                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all active:scale-95"
+                aria-label="Next"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3D Scene - theme changes each time game starts */}
       <div className="absolute inset-0">
         <AlphabetStreet
+          sceneTheme={sceneTheme}
           items={currentContent}
           onItemClick={handleItemClick}
           showStar={showStar}
@@ -351,6 +440,19 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
           {!isMobile && <span>Reset Game</span>}
+        </button>
+      </div>
+
+      {/* Change View Button - Bottom Right */}
+      <div className={`absolute ${isMobile ? 'bottom-24 right-3' : 'bottom-6 right-4'} z-30`}>
+        <button
+          onClick={handleChangeTheme}
+          className={`bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold ${isMobile ? 'w-14 h-14' : 'py-3 px-4'} rounded-full shadow-xl transition-all duration-200 active:scale-95 flex items-center justify-center ${isMobile ? '' : 'gap-2'} touch-manipulation`}
+          aria-label="Change Theme"
+          title="Change view"
+        >
+          <span className={isMobile ? "text-2xl" : "text-lg"}>🎨</span>
+          {!isMobile && <span>Change View</span>}
         </button>
       </div>
 

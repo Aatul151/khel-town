@@ -11,8 +11,121 @@ import { AvatarType } from "../../../../components/AvatarSelector";
 import { useAvatarControls } from "../../../../hooks/useAvatarControls";
 import { useIsMobile } from "../../../../hooks/useIsMobile";
 import { playWalkingSound, stopWalkingSound } from "../../../../utils/audio";
+import type { SceneThemeId } from "../AlphabetFinderGame";
+
+/** Drei Environment preset names (subset we use). */
+type EnvPreset = "sunset" | "dawn" | "park" | "forest" | "apartment" | "studio" | "warehouse" | "night";
+
+/** Theme-specific colors and lighting; boxes stay the same. envPreset overrides HDRI when theme has no built-in preset. */
+export const THEME_CONFIG: Record<
+  SceneThemeId,
+  { 
+    groundColor: string; 
+    skyColor: string; 
+    skyGradient?: { from: string; to: string };
+    ambientIntensity: number; 
+    directionalIntensity: number; 
+    pointLightColor: string; 
+    pointLightIntensity: number;
+    envPreset?: EnvPreset; // use when theme id is not a valid drei preset (e.g. jungle -> forest, beach -> sunset)
+  }
+> = {
+  sunset: { 
+    groundColor: "#fef3e2", 
+    skyColor: "#ffd4a3",
+    skyGradient: { from: "#ffb347", to: "#ff8c69" },
+    ambientIntensity: 0.65, 
+    directionalIntensity: 1, 
+    pointLightColor: "#ffaa66", 
+    pointLightIntensity: 0.6 
+  },
+  dawn: { 
+    groundColor: "#f5e6ff", 
+    skyColor: "#e6d4ff",
+    skyGradient: { from: "#d4b3ff", to: "#c299ff" },
+    ambientIntensity: 0.6, 
+    directionalIntensity: 0.9, 
+    pointLightColor: "#e8c4ff", 
+    pointLightIntensity: 0.5 
+  },
+  park: { 
+    groundColor: "#e8f5e9", 
+    skyColor: "#b8e6c1",
+    skyGradient: { from: "#a5d6a7", to: "#81c784" },
+    ambientIntensity: 0.7, 
+    directionalIntensity: 1.1, 
+    pointLightColor: "#a5d6a7", 
+    pointLightIntensity: 0.4 
+  },
+  forest: { 
+    groundColor: "#e8e0d5", 
+    skyColor: "#d4c4b0",
+    skyGradient: { from: "#c8b896", to: "#a09070" },
+    ambientIntensity: 0.55, 
+    directionalIntensity: 0.85, 
+    pointLightColor: "#c8b896", 
+    pointLightIntensity: 0.5 
+  },
+  jungle: { 
+    groundColor: "#2d4a2d", 
+    skyColor: "#1a3d1a",
+    skyGradient: { from: "#0d2810", to: "#2d5a2d" },
+    ambientIntensity: 0.5, 
+    directionalIntensity: 0.75, 
+    pointLightColor: "#6b8e6b", 
+    pointLightIntensity: 0.55,
+    envPreset: "forest"
+  },
+  beach: { 
+    groundColor: "#e8dcc8", 
+    skyColor: "#87ceeb",
+    skyGradient: { from: "#b0e0e6", to: "#ffd89b" },
+    ambientIntensity: 0.75, 
+    directionalIntensity: 1.1, 
+    pointLightColor: "#fff5e1", 
+    pointLightIntensity: 0.6,
+    envPreset: "sunset"
+  },
+  apartment: { 
+    groundColor: "#f5f5dc", 
+    skyColor: "#fffef0",
+    skyGradient: { from: "#fff8e7", to: "#fffacd" },
+    ambientIntensity: 0.7, 
+    directionalIntensity: 1, 
+    pointLightColor: "#fff8e7", 
+    pointLightIntensity: 0.5 
+  },
+  studio: { 
+    groundColor: "#ececec", 
+    skyColor: "#f5f5f5",
+    skyGradient: { from: "#ffffff", to: "#e0e0e0" },
+    ambientIntensity: 0.75, 
+    directionalIntensity: 1.2, 
+    pointLightColor: "#ffffff", 
+    pointLightIntensity: 0.45 
+  },
+  warehouse: { 
+    groundColor: "#e0e4e8", 
+    skyColor: "#d0d8e0",
+    skyGradient: { from: "#b0c4de", to: "#87ceeb" },
+    ambientIntensity: 0.6, 
+    directionalIntensity: 1, 
+    pointLightColor: "#b0c4de", 
+    pointLightIntensity: 0.5 
+  },
+  night: { 
+    groundColor: "#2a2a3a", 
+    skyColor: "#1a1a2e",
+    skyGradient: { from: "#0f0f1e", to: "#2a2a3a" },
+    ambientIntensity: 0.35, 
+    directionalIntensity: 0.5, 
+    pointLightColor: "#8899cc", 
+    pointLightIntensity: 0.7 
+  },
+};
 
 interface AlphabetStreetProps {
+  sceneTheme?: SceneThemeId;
   items: LearningItem[];
   onItemClick: (item: LearningItem, position: [number, number, number]) => void;
   showStar: boolean;
@@ -41,6 +154,7 @@ interface AlphabetStreetProps {
 }
 
 export function AlphabetStreet({
+  sceneTheme = "sunset",
   items,
   onItemClick,
   showStar,
@@ -65,6 +179,7 @@ export function AlphabetStreet({
   isMoving: externalIsMoving = false,
   onTouchGesture,
 }: AlphabetStreetProps) {
+  const themeConfig = THEME_CONFIG[sceneTheme];
   // Navigation management - use external controls if provided, otherwise use internal hook
   const internalControls = useAvatarControls();
   const direction = externalDirection !== null ? externalDirection : internalControls.direction;
@@ -570,16 +685,16 @@ export function AlphabetStreet({
       gl={{ antialias: true, alpha: true }}
       style={{ width: "100%", height: "100%" }}
     >
-      {/* Lighting setup for kid-friendly, colorful scene */}
-      <ambientLight intensity={0.6} />
+      {/* Theme-based lighting - changes each time game starts */}
+      <ambientLight intensity={themeConfig.ambientIntensity} />
       <directionalLight
         position={[10, 10, 5]}
-        intensity={1}
+        intensity={themeConfig.directionalIntensity}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
       />
-      <pointLight position={[-10, 10, -10]} intensity={0.5} color="#fff5e1" />
+      <pointLight position={[-10, 10, -10]} intensity={themeConfig.pointLightIntensity} color={themeConfig.pointLightColor} />
 
       {/* Camera with dynamic position - will be controlled by CameraController */}
       <PerspectiveCamera
@@ -595,10 +710,20 @@ export function AlphabetStreet({
         isMobile={isMobile}
       />
 
-      {/* Ground plane */}
+      {/* Sky sphere - theme color, visible when looking up */}
+      <mesh>
+        <sphereGeometry args={[200, 32, 32]} />
+        <meshStandardMaterial 
+          color={themeConfig.skyColor} 
+          side={THREE.BackSide}
+          fog={false}
+        />
+      </mesh>
+
+      {/* Ground plane - theme color */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]} receiveShadow>
         <planeGeometry args={[100, 100]} />
-        <meshStandardMaterial color="#e5e7eb" />
+        <meshStandardMaterial color={themeConfig.groundColor} />
       </mesh>
 
       {/* Learning item buildings - grid layout */}
@@ -641,9 +766,9 @@ export function AlphabetStreet({
         </Suspense>
       )}
 
-      {/* Environment for better lighting */}
+      {/* Environment - theme preset (jungle/beach use envPreset) */}
       <Suspense fallback={null}>
-        <Environment preset="sunset" />
+        <Environment preset={themeConfig.envPreset ?? (sceneTheme === "jungle" ? "forest" : sceneTheme === "beach" ? "sunset" : sceneTheme)} />
       </Suspense>
     </Canvas>
   );
