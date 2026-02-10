@@ -19,7 +19,7 @@ export function Avatar3D({
   position: initialPosition,
   targetPosition,
   onReachTarget,
-  isWalking: _isWalking, // Prop kept for interface compatibility but not used internally
+  isWalking = false,
   isKeyboardMoving = false,
   onRotationChange,
   rotation,
@@ -83,14 +83,16 @@ export function Avatar3D({
     }
   }, [targetPosition, currentPosition, walking]);
 
-  // Track if avatar is moving (either to target or via keyboard)
-  const isActuallyMoving = walking || isKeyboardMoving;
+  // Track if avatar is moving (target, keyboard, or parent says walking e.g. followers)
+  const isActuallyMoving = walking || isKeyboardMoving || isWalking;
+  // Slightly faster cycle when isWalking (e.g. followers chasing) so run is more visible
+  const walkSpeed = isWalking && !isKeyboardMoving ? 12 : 8;
 
   useFrame((state) => {
     if (!groupRef.current) return;
 
     // Walking animation for arms and legs
-    const walkCycle = isActuallyMoving ? state.clock.elapsedTime * 8 : 0;
+    const walkCycle = isActuallyMoving ? state.clock.elapsedTime * walkSpeed : 0;
     const armSwing = Math.sin(walkCycle) * 0.6;
     const legSwing = Math.sin(walkCycle) * 0.4;
 

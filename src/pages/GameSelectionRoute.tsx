@@ -20,7 +20,7 @@ export function GameSelectionRoute() {
       alphabetProgress.completedItems.length >= alphabetContent.length;
 
     // Letter Match game completion (simplified - can be enhanced with proper tracking)
-    const letterMatchCompleted = false; // Can be enhanced with proper game completion tracking
+    // const letterMatchCompleted = false; // Can be enhanced with proper game completion tracking
 
     return [
       {
@@ -32,21 +32,38 @@ export function GameSelectionRoute() {
         completed: alphabetCompleted,
       },
       {
-        id: "letter-match",
-        name: "Letter Match",
-        description: "Match uppercase and lowercase letters",
-        emoji: "🔗",
-        color: "#10b981",
-        completed: letterMatchCompleted,
+        id: "pakad-ke-dikhao",
+        name: "Pakad ke Dikhao",
+        description: "Survive the followers! Don't get caught!",
+        emoji: "🏃💨",
+        color: "#ef4444",
+        completed: false,
       },
+      {
+        id: "bhul-bhalaiya",
+        name: "Bhul Bhalaiya",
+        description: "Find your way out of the maze!",
+        emoji: "🧩",
+        color: "#b45309",
+        completed: false,
+      },
+      // {
+      //   id: "letter-match",
+      //   name: "Letter Match",
+      //   description: "Match uppercase and lowercase letters",
+      //   emoji: "🔗",
+      //   color: "#10b981",
+      //   completed: letterMatchCompleted,
+      // },
       {
         id: "obstacle-dodge",
         name: "Obstacle Dodge",
         description: "Dodge obstacles and survive as long as possible",
-        emoji: "🏃",
+        emoji: "🚧",
         color: "#f59e0b",
         completed: false,
       },
+      
     ];
   };
 
