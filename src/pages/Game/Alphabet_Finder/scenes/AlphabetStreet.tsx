@@ -13,6 +13,39 @@ import { useIsMobile } from "../../../../hooks/useIsMobile";
 import { playWalkingSound, stopWalkingSound } from "../../../../utils/audio";
 import type { SceneThemeId } from "../AlphabetFinderGame";
 
+/** Red warning circle indicator that appears below avatar when follower is near */
+function WarningCircle({ position, intensity }: { position: [number, number, number]; intensity: number }) {
+  const circleRef = useRef<THREE.Mesh>(null);
+  const pulseRef = useRef(0);
+
+  useFrame(() => {
+    if (circleRef.current) {
+      // Pulsing animation - faster when intensity is higher
+      pulseRef.current += 0.1 + (intensity * 0.15);
+      const scale = 1 + Math.sin(pulseRef.current) * 0.2 * intensity;
+      circleRef.current.scale.set(scale, scale, 1);
+      
+      // Opacity based on intensity
+      const material = circleRef.current.material as THREE.MeshStandardMaterial;
+      material.opacity = 0.3 + (intensity * 0.7);
+      material.emissiveIntensity = intensity * 2;
+    }
+  });
+
+  return (
+    <mesh ref={circleRef} position={position} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <ringGeometry args={[0.8, 1.2, 32]} />
+      <meshStandardMaterial
+        color="#ff0000"
+        emissive="#ff0000"
+        transparent
+        opacity={0.5}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
 /** Drei Environment preset names (subset we use). */
 type EnvPreset = "sunset" | "dawn" | "park" | "forest" | "apartment" | "studio" | "warehouse" | "night";
 
@@ -151,6 +184,11 @@ interface AlphabetStreetProps {
   isMoving?: boolean;
   // Optional touch gesture handlers (for external control integration)
   onTouchGesture?: (action: "up" | "down" | "left" | "right") => void;
+  // Follower/chaser mechanic
+  onGameOver?: () => void; // Called when follower catches avatar
+  enableFollower?: boolean; // Enable/disable follower
+  onFollowerDistanceChange?: (distance: number) => void; // Report distance for warning UI
+  isGameActive?: boolean; // Whether game is active (not in overlay)
 }
 
 export function AlphabetStreet({
@@ -178,6 +216,10 @@ export function AlphabetStreet({
   rotationDirection: externalRotationDirection = null,
   isMoving: externalIsMoving = false,
   onTouchGesture,
+  onGameOver,
+  enableFollower = true,
+  onFollowerDistanceChange,
+  isGameActive = true,
 }: AlphabetStreetProps) {
   const themeConfig = THEME_CONFIG[sceneTheme];
   // Navigation management - use external controls if provided, otherwise use internal hook
@@ -204,6 +246,12 @@ export function AlphabetStreet({
   const avatarPosition = internalAvatarPosition;
   const avatarRotation = internalAvatarRotation;
   const isAvatarMoving = internalIsAvatarMoving;
+
+  // Follower/chaser state - starts far behind avatar
+  const [followerPosition, setFollowerPosition] = useState<[number, number, number]>([0, 0, -30]);
+  const [followerRotation, setFollowerRotation] = useState<number>(0);
+  const followerSpeed = useRef(0.08); // Base speed - slightly slower than avatar
+  const [followerDistance, setFollowerDistance] = useState<number>(100); // Track distance for indicator
 
   // Navigation Management Functions - Natural avatar navigation
   // Left/Right/Down: Rotate avatar direction AND set camera behind avatar immediately
@@ -344,7 +392,82 @@ export function AlphabetStreet({
   useEffect(() => {
     setInternalAvatarPosition([0, 0, -20]);
     setInternalAvatarRotation(0);
+    setFollowerPosition([0, 0, -30]); // Reset follower far behind
+    followerSpeed.current = 0.08; // Reset speed
   }, [shuffleKey]);
+
+  // Follower movement - chases avatar
+  useEffect(() => {
+    if (!enableFollower || !isGameActive) return; // Don't move follower during round overlay
+
+    const interval = setInterval(() => {
+      setFollowerPosition(prev => {
+        const [fx, fy, fz] = prev;
+        const [ax, , az] = avatarPosition;
+
+        // Calculate direction to avatar
+        const dx = ax - fx;
+        const dz = az - fz;
+        const distance = Math.sqrt(dx * dx + dz * dz);
+
+        // Update local distance state for indicator
+        setFollowerDistance(distance);
+
+        // Report distance to parent for warning UI
+        if (onFollowerDistanceChange) {
+          onFollowerDistanceChange(distance);
+        }
+
+        // Check if caught (distance < 1.5 units)
+        if (distance < 1.5 && onGameOver) {
+          onGameOver();
+          return prev; // Stop movement
+        }
+
+        // Update follower rotation to face avatar
+        if (distance > 0.1) {
+          const targetRotation = Math.atan2(dx, dz);
+          setFollowerRotation(targetRotation);
+        }
+
+        // Move follower toward avatar
+        if (distance > 0.1) {
+          const moveSpeed = followerSpeed.current;
+          // Gradually increase speed as game progresses (based on completed items)
+          const speedMultiplier = 1 + (completedItems.length * 0.01); // Gets faster as more letters found
+          const adjustedSpeed = moveSpeed * speedMultiplier;
+
+          const normalizedDx = dx / distance;
+          const normalizedDz = dz / distance;
+
+          let newFx = fx + normalizedDx * adjustedSpeed;
+          let newFz = fz + normalizedDz * adjustedSpeed;
+
+          // Keep follower within bounds (same as avatar)
+          if (currentMode === "alphabet") {
+            const gridSize = 6;
+            const spacing = 9;
+            const boxSize = 3.5;
+            const buffer = boxSize / 2 + 2;
+            const maxRow = gridSize - 1;
+            const maxCol = gridSize - 1;
+            const maxX = (maxCol - (gridSize - 1) / 2) * spacing + buffer;
+            const maxZ = (maxRow - (gridSize - 1) / 2) * spacing + buffer;
+            const minX = -maxX;
+            const minZ = -maxZ;
+            newFx = Math.max(minX, Math.min(maxX, newFx));
+            newFz = Math.max(minZ, Math.min(maxZ, newFz));
+          }
+
+          return [newFx, fy, newFz];
+        }
+
+        return prev;
+      });
+    }, 16); // ~60fps
+
+    return () => clearInterval(interval);
+  }, [avatarPosition, enableFollower, onGameOver, currentMode, completedItems.length, isGameActive, onFollowerDistanceChange]);
 
   // Touch gesture handlers for mobile swipe navigation
   // Touch and hold = continuous forward movement
@@ -738,15 +861,38 @@ export function AlphabetStreet({
 
       {/* 3D Avatar */}
       {avatarType && (
+        <>
+          <Avatar3D
+            avatarType={avatarType}
+            position={avatarPosition}
+            targetPosition={avatarTarget}
+            onReachTarget={onAvatarReachTarget}
+            isWalking={avatarTarget !== null}
+            isKeyboardMoving={isAvatarMoving}
+            onRotationChange={undefined} // Don't update camera rotation from avatar movement
+            rotation={avatarRotation}
+          />
+          
+          {/* Red warning circle at bottom of avatar when follower is near */}
+          {enableFollower && isGameActive && followerDistance < 8 && (
+            <WarningCircle 
+              position={[avatarPosition[0], 0.05, avatarPosition[2]]} 
+              intensity={Math.max(0, 1 - (followerDistance / 8))} // More intense when closer
+            />
+          )}
+        </>
+      )}
+
+      {/* Follower/Chaser - follows behind avatar */}
+      {enableFollower && isGameActive && (
         <Avatar3D
-          avatarType={avatarType}
-          position={avatarPosition}
-          targetPosition={avatarTarget}
-          onReachTarget={onAvatarReachTarget}
-          isWalking={avatarTarget !== null}
-          isKeyboardMoving={isAvatarMoving}
-          onRotationChange={undefined} // Don't update camera rotation from avatar movement
-          rotation={avatarRotation}
+          avatarType="robot" // Use robot as the chaser
+          position={followerPosition}
+          targetPosition={null}
+          onReachTarget={() => {}}
+          isWalking={true}
+          isKeyboardMoving={true}
+          rotation={followerRotation}
         />
       )}
 

@@ -6,7 +6,7 @@ import { PromptDisplay } from "./components/PromptDisplay";
 import { LearningItem, LearningMode } from "../../../data/types";
 import { getContentForMode } from "../../../data/index";
 import { getProgress, addStar, markItemComplete, resetProgress } from "../../../utils/storage";
-import { playPhonicsAudio, stopAllAudio, playBackgroundMusic } from "../../../utils/audio";
+import { playPhonicsAudio, stopAllAudio, playBackgroundMusic, stopBackgroundMusic, stopWalkingSound } from "../../../utils/audio";
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import { useAvatarControls } from "../../../hooks/useAvatarControls";
 import { AvatarType } from "../../../components/AvatarSelector";
@@ -68,7 +68,9 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
   const [shuffleKey, setShuffleKey] = useState(0);
   const [sceneTheme, setSceneTheme] = useState<SceneThemeId>(() => pickRandomTheme());
   const [roundNumber, setRoundNumber] = useState(1);
-  const [showRoundOverlay, setShowRoundOverlay] = useState(true);
+  const [showRoundOverlay, setShowRoundOverlay] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
+  const [followerDistance, setFollowerDistance] = useState<number | null>(null);
 
   // Get current content based on mode
   const currentContent = getContentForMode(currentMode);
@@ -199,7 +201,9 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
       setShuffleKey(prev => prev + 1);
       setSceneTheme(pickRandomTheme());
       setRoundNumber(prev => prev + 1);
-      setShowRoundOverlay(true);
+      // setShowRoundOverlay(true);
+      setGameOver(false);
+      setFollowerDistance(null);
       stopAllAudio();
       playBackgroundMusic();
     }
@@ -211,6 +215,41 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
 
   const handleRoundNext = () => {
     setShowRoundOverlay(false);
+  };
+
+  const handleGameOver = () => {
+    setGameOver(true);
+    // Stop background music and walking sound, but allow caught message to play
+    stopBackgroundMusic();
+    stopWalkingSound();
+    // Play caught voice message
+    playPhonicsAudio("", "Oh no! You were caught! The follower got you! Try again and find the letters faster!");
+  };
+
+  const handleFollowerDistanceChange = (distance: number) => {
+    setFollowerDistance(distance);
+  };
+
+  const handleRestartAfterGameOver = () => {
+    setGameOver(false);
+    setFollowerDistance(null);
+    // Reset game state without confirmation
+    resetProgress(currentMode);
+    setScore(0);
+    setStars(0);
+    setCompletedItems([]);
+    setProgress(0);
+    setCurrentItem(null);
+    setShowStar(false);
+    setAvatarPosition([0, 0, -20]);
+    setShowSuccess(false);
+    setPromptItem(null);
+    setShuffleKey(prev => prev + 1);
+    setSceneTheme(pickRandomTheme());
+    setRoundNumber(prev => prev + 1);
+    // setShowRoundOverlay(true);
+    stopAllAudio();
+    playBackgroundMusic();
   };
 
   const handleStarComplete = () => {
@@ -362,6 +401,10 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
           rotationDirection={rotationDirection}
           isMoving={isMoving}
           onTouchGesture={isMobile ? handleTouchGesture : undefined}
+          onGameOver={handleGameOver}
+          enableFollower={true}
+          onFollowerDistanceChange={handleFollowerDistanceChange}
+          isGameActive={!showRoundOverlay && !gameOver}
         />
       </div>
 
@@ -415,6 +458,55 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
             <div className={`${isMobile ? 'text-3xl' : 'text-4xl'} text-center mb-2`}>⚠️</div>
             <div className={`${isMobile ? 'text-lg' : 'text-xl'} font-bold text-center`}>Get Closer!</div>
             <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-center mt-1`}>Move your avatar near the box</div>
+          </div>
+        </div>
+      )}
+
+      {/* Follower Warning - when follower is close */}
+      {followerDistance !== null && followerDistance < 5 && !gameOver && !showRoundOverlay && (
+        <div className={`absolute ${isMobile ? 'top-20' : 'top-24'} left-1/2 transform -translate-x-1/2 z-40`}>
+          <div className={`bg-red-600 text-white rounded-2xl ${isMobile ? 'px-4 py-3' : 'px-6 py-4'} shadow-2xl ${followerDistance < 3 ? 'animate-pulse' : ''}`}>
+            <div className={`${isMobile ? 'text-2xl' : 'text-3xl'} text-center mb-1`}>
+              {followerDistance < 3 ? '🏃💨' : '👀'}
+            </div>
+            <div className={`${isMobile ? 'text-base' : 'text-lg'} font-bold text-center`}>
+              {followerDistance < 3 ? 'RUN! Follower is close!' : 'Follower is nearby!'}
+            </div>
+            <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-center mt-1`}>
+              Distance: {followerDistance.toFixed(1)}m
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Game Over Modal */}
+      {gameOver && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className={`bg-white rounded-2xl shadow-2xl ${isMobile ? 'p-6 mx-4' : 'p-8'} max-w-md w-full text-center`}>
+            <div className={`${isMobile ? 'text-5xl' : 'text-6xl'} mb-4`}>😱</div>
+            <div className={`${isMobile ? 'text-2xl' : 'text-3xl'} font-bold text-gray-800 mb-2`}>
+              Caught!
+            </div>
+            <div className={`${isMobile ? 'text-base' : 'text-lg'} text-gray-600 mb-6`}>
+              The follower caught you! Try to find letters faster next time.
+            </div>
+            <div className={`${isMobile ? 'text-sm' : 'text-base'} text-gray-500 mb-6`}>
+              Letters found: {completedItems.length} / {currentContent.length}
+            </div>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleRestartAfterGameOver}
+                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={handleBack}
+                className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95"
+              >
+                Back to Menu
+              </button>
+            </div>
           </div>
         </div>
       )}
