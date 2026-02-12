@@ -82,6 +82,8 @@ export function PakadKeDikhaoGame({ avatar, onBack, onGameComplete: _onGameCompl
   const [_followerDistances, setFollowerDistances] = useState<number[]>([]);
   const [showWarning, setShowWarning] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>("follow");
+  const [followerPositions, setFollowerPositions] = useState<[number, number, number][]>([]);
+  const [avatarRotation, setAvatarRotation] = useState<number>(0);
 
   // Timer ref
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -259,6 +261,8 @@ export function PakadKeDikhaoGame({ avatar, onBack, onGameComplete: _onGameCompl
             onTouchGestureEnd={isMobile ? (action) => handleTouchEnd(action) : undefined}
             cameraMode={cameraMode}
             enableFollower={hasPlayerMoved}
+            onFollowerPositionsChange={setFollowerPositions}
+            onAvatarRotationChange={setAvatarRotation}
           />
         </div>
       )}
@@ -446,6 +450,72 @@ export function PakadKeDikhaoGame({ avatar, onBack, onGameComplete: _onGameCompl
               {isMobile ? "Hold RUN to move · ← → turn" : "Arrow keys to move"}
             </div>
           </div>
+
+          {/* Minimap - Only show when in follow view */}
+          {cameraMode === "follow" && (
+            <div
+              className={`absolute z-30 right-3 ${isMobile ? "" : "bottom-24"}`}
+              style={isMobile ? { bottom: "calc(max(1rem, env(safe-area-inset-bottom, 0px) + 0.5rem) + 4rem)" } : undefined}
+            >
+              <div className="bg-black/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 p-2">
+                <div className={`${isMobile ? "w-24 h-24" : "w-32 h-32"} relative`}>
+                  <svg
+                    viewBox="-100 -100 200 200"
+                    className="w-full h-full"
+                    style={{ transform: "scaleY(-1)" }}
+                  >
+                    {/* Playground bounds indicator */}
+                    <circle
+                      cx="0"
+                      cy="0"
+                      r="100"
+                      fill="rgba(255, 255, 255, 0.1)"
+                      stroke="rgba(255, 255, 255, 0.3)"
+                      strokeWidth="1"
+                    />
+                    
+                    {/* Followers */}
+                    {followerPositions.map((pos, index) => {
+                      const [x, , z] = pos;
+                      return (
+                        <circle
+                          key={`follower-${index}`}
+                          cx={x}
+                          cy={z}
+                          r="3"
+                          fill="#ef4444"
+                          stroke="#ffffff"
+                          strokeWidth="0.5"
+                          opacity="0.9"
+                        />
+                      );
+                    })}
+                    
+                    {/* Avatar */}
+                    <circle
+                      cx={avatarPosition[0]}
+                      cy={avatarPosition[2]}
+                      r="4"
+                      fill="#10b981"
+                      stroke="#ffffff"
+                      strokeWidth="1"
+                    />
+                    
+                    {/* Avatar direction indicator */}
+                    <line
+                      x1={avatarPosition[0]}
+                      y1={avatarPosition[2]}
+                      x2={avatarPosition[0] + Math.sin(avatarRotation) * 8}
+                      y2={avatarPosition[2] + Math.cos(avatarRotation) * 8}
+                      stroke="#10b981"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Camera toggle: bottom right, safe area on mobile */}
           <div

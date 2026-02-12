@@ -102,6 +102,10 @@ interface PlaygroundSceneProps {
   cameraMode?: CameraMode;
   /** Enable/disable follower movement - followers only start following after player moves */
   enableFollower?: boolean;
+  /** Optional callback to report follower positions for minimap */
+  onFollowerPositionsChange?: (positions: [number, number, number][]) => void;
+  /** Optional callback to report avatar rotation for minimap */
+  onAvatarRotationChange?: (rotation: number) => void;
 }
 
 /** Red warning circle indicator that appears below avatar when follower is near */
@@ -150,6 +154,8 @@ export function PlaygroundScene({
   onTouchGestureEnd,
   cameraMode = "follow",
   enableFollower = true,
+  onFollowerPositionsChange,
+  onAvatarRotationChange,
 }: PlaygroundSceneProps) {
   const isMobile = useIsMobile();
   const internalControls = useAvatarControls();
@@ -169,13 +175,42 @@ export function PlaygroundScene({
 
   // Per-follower config: different speed and behavior so they don't all act the same
   const followerConfigsRef = useRef<FollowerConfig[] | null>(null);
-  if (followerConfigsRef.current === null) {
-    const behaviors: FollowerBehavior[] = ["direct", "sprint_burst", "zigzag", "patient", "aggressive"];
-    followerConfigsRef.current = Array.from({ length: followerCount }, (_, i) => ({
-      speedMultiplier: 0.055 + (i % 3) * 0.03 + (i * 0.008),
-      behavior: behaviors[i % behaviors.length],
-      unpredictability: 0.05 + (i % 4) * 0.08,
-    }));
+  const lastFollowerCountRef = useRef<number>(-1);
+  
+  // Initialize or update follower configs when count changes
+  if (followerConfigsRef.current === null || lastFollowerCountRef.current !== followerCount) {
+    // Determine how many aggressive followers based on total count
+    let aggressiveCount = 0;
+    if (followerCount === 3) {
+      aggressiveCount = 1;
+    } else if (followerCount === 5) {
+      aggressiveCount = 2;
+    } else if (followerCount === 10) {
+      aggressiveCount = 3;
+    } else if (followerCount === 15) {
+      aggressiveCount = 4;
+    }
+    
+    // Other behaviors to distribute
+    const otherBehaviors: FollowerBehavior[] = ["direct", "sprint_burst", "zigzag", "patient"];
+    
+    followerConfigsRef.current = Array.from({ length: followerCount }, (_, i) => {
+      let behavior: FollowerBehavior;
+      // Assign aggressive to first N followers
+      if (i < aggressiveCount) {
+        behavior = "aggressive";
+      } else {
+        // Distribute other behaviors among remaining followers
+        behavior = otherBehaviors[(i - aggressiveCount) % otherBehaviors.length];
+      }
+      
+      return {
+        speedMultiplier: 0.055 + (i % 3) * 0.03 + (i * 0.008),
+        behavior: behavior,
+        unpredictability: 0.05 + (i % 4) * 0.08,
+      };
+    });
+    lastFollowerCountRef.current = followerCount;
   }
   const followerConfigs = followerConfigsRef.current;
 
@@ -185,9 +220,13 @@ export function PlaygroundScene({
 
   function getInitialFollowerPositions(count: number): [number, number, number][] {
     const positions: [number, number, number][] = [];
+    // Start followers much further away from player (minimum 30 units, spread out)
+    const minRadius = 30;
+    const maxRadius = 60;
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2 + (i * 0.5);
-      const radius = 12 + (i * 3);
+      // Distribute followers between minRadius and maxRadius
+      const radius = minRadius + ((i / Math.max(1, count - 1)) * (maxRadius - minRadius));
       positions.push([Math.sin(angle) * radius, 0, Math.cos(angle) * radius]);
     }
     return positions;
@@ -218,6 +257,9 @@ export function PlaygroundScene({
     followerPositionsRef.current = getInitialFollowerPositions(followerCount);
     followerRotationsRef.current = new Array(followerCount).fill(0);
     minFollowerDistanceRef.current = 100;
+    // Reset configs so they get regenerated with new count
+    followerConfigsRef.current = null;
+    lastFollowerCountRef.current = -1;
   }, [followerCount]);
 
   // Handle avatar rotation
@@ -244,6 +286,13 @@ export function PlaygroundScene({
       return;
     }
   }, [rotationDirection]);
+
+  // Report avatar rotation changes for minimap
+  useEffect(() => {
+    if (onAvatarRotationChange) {
+      onAvatarRotationChange(internalAvatarRotation);
+    }
+  }, [internalAvatarRotation, onAvatarRotationChange]);
 
   // Walking sound when movement starts/stops
   useEffect(() => {
@@ -513,12 +562,15 @@ export function PlaygroundScene({
         const minDist = Math.min(...newDistances);
         minFollowerDistanceRef.current = minDist;
         queueMicrotask(() => onFollowerDistanceChange(newDistances));
+        if (onFollowerPositionsChange) {
+          queueMicrotask(() => onFollowerPositionsChange(newPositions));
+        }
         setGameLoopTick(t => t + 1);
       }
     }, 16);
 
     return () => clearInterval(interval);
-  }, [onGameOver, onFollowerDistanceChange, followerCount, obstacles, enableFollower]);
+  }, [onGameOver, onFollowerDistanceChange, followerCount, obstacles, enableFollower, onFollowerPositionsChange]);
 
   // Camera controller: follow (third-person) or top-down view
   function CameraController({
