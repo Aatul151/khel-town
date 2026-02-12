@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Environment, PerspectiveCamera } from "@react-three/drei";
 import * as THREE from "three";
 import { Avatar3D } from "../../../../components/Avatar3D";
+import { FollowerAvatar3D, FollowerAvatarType } from "../../../../components/FollowerAvatar3D";
 import { AvatarType } from "../../../../components/AvatarSelector";
 import { useAvatarControls } from "../../../../hooks/useAvatarControls";
 import { useIsMobile } from "../../../../hooks/useIsMobile";
@@ -89,7 +90,7 @@ interface PlaygroundSceneProps {
   avatarPosition: [number, number, number];
   onAvatarPositionChange: (position: [number, number, number]) => void;
   followerCount: number;
-  followerAvatarTypes: AvatarType[];
+  followerAvatarTypes: FollowerAvatarType[];
   onGameOver: () => void;
   onFollowerDistanceChange: (distances: number[]) => void;
   direction?: "up" | "down" | "left" | "right" | null;
@@ -184,11 +185,11 @@ export function PlaygroundScene({
     if (followerCount === 3) {
       aggressiveCount = 1;
     } else if (followerCount === 5) {
-      aggressiveCount = 2;
+      aggressiveCount = 1;
     } else if (followerCount === 10) {
-      aggressiveCount = 3;
+      aggressiveCount = 2;
     } else if (followerCount === 15) {
-      aggressiveCount = 4;
+      aggressiveCount = 3;
     }
     
     // Other behaviors to distribute
@@ -786,15 +787,12 @@ export function PlaygroundScene({
 
       {/* Followers - positions/rotations from refs updated by single game loop (moves while player moves) */}
       {followerPositionsRef.current.map((followerPos, index) => (
-        <Avatar3D
+        <FollowerAvatar3D
           key={index}
-          avatarType={followerAvatarTypes[index % followerAvatarTypes.length]}
+          avatarType={followerAvatarTypes[index]}
           position={followerPos}
-          targetPosition={null}
-          onReachTarget={() => {}}
-          isWalking={true}
-          isKeyboardMoving={true}
           rotation={followerRotationsRef.current[index] ?? 0}
+          isWalking={true}
         />
       ))}
 

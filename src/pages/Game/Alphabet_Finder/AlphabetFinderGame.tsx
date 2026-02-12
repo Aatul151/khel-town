@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AlphabetStreet } from "./scenes/AlphabetStreet";
-import { getButtonClasses, BUTTON_MEDIUM } from "../../../utils/buttonStyles";
+import { getButtonClasses } from "../../../utils/buttonStyles";
 import { Countdown } from "../../../components/Countdown";
 import { THEME_CONFIG } from "./scenes/AlphabetStreet";
-import { HUD } from "../../../ui/HUD";
 import { PromptDisplay } from "./components/PromptDisplay";
 import { LearningItem, LearningMode } from "../../../data/types";
 import { getContentForMode } from "../../../data/index";
@@ -61,7 +60,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
   const [promptItem, setPromptItem] = useState<LearningItem | null>(null);
   const [showStar, setShowStar] = useState(false);
   const [starPosition, setStarPosition] = useState<[number, number, number] | null>(null);
-  const [progress, setProgress] = useState(0);
+  const [, setProgress] = useState(0);
   const [completedItems, setCompletedItems] = useState<string[]>([]);
   const [avatarPosition, setAvatarPosition] = useState<[number, number, number]>([0, 0, -20]);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -131,8 +130,8 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
   useEffect(() => {
     if (!gameStarted) return;
     
-    const [initX, initY, initZ] = initialAvatarPosition.current;
-    const [currX, currY, currZ] = avatarPosition;
+    const [initX, , initZ] = initialAvatarPosition.current;
+    const [currX, , currZ] = avatarPosition;
     
     // Check if player has moved from initial position (threshold of 0.5 units)
     const distance = Math.sqrt(

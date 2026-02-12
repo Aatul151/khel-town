@@ -7,6 +7,7 @@ import { useAvatarControls } from "../../../hooks/useAvatarControls";
 import { AvatarType } from "../../../components/AvatarSelector";
 import { usePlayer } from "../../../context/PlayerContext";
 import { Countdown } from "../../../components/Countdown";
+import { FollowerAvatarType } from "../../../components/FollowerAvatar3D";
 
 // Follower count options - user selects in menu
 export const FOLLOWER_COUNT_OPTIONS = [3, 5, 10, 15] as const;
@@ -16,8 +17,26 @@ export type FollowerCountOption = (typeof FOLLOWER_COUNT_OPTIONS)[number];
 export type TimeLevel = 2 | 3 | 5 | 10;
 export const TIME_LEVELS: TimeLevel[] = [2, 3, 5, 10];
 
-// Follower avatar types - different types for variety
-const FOLLOWER_AVATAR_TYPES: AvatarType[] = ["robot", "boy", "girl", "robot"];
+// Follower avatar groups - unique avatars for each follower count
+function getFollowerAvatarGroup(count: FollowerCountOption): FollowerAvatarType[] {
+  if (count === 3) {
+    return ["follower_1", "follower_2", "follower_3"];
+  } else if (count === 5) {
+    return ["follower_1", "follower_2", "follower_3", "follower_4", "follower_5"];
+  } else if (count === 10) {
+    return [
+      "follower_1", "follower_2", "follower_3", "follower_4", "follower_5",
+      "follower_6", "follower_7", "follower_8", "follower_9", "follower_10"
+    ];
+  } else if (count === 15) {
+    return [
+      "follower_1", "follower_2", "follower_3", "follower_4", "follower_5",
+      "follower_6", "follower_7", "follower_8", "follower_9", "follower_10",
+      "follower_11", "follower_12", "follower_13", "follower_14", "follower_15"
+    ];
+  }
+  return ["follower_1", "follower_2", "follower_3"];
+}
 
 /** Mobile button that fires on pointer down/up with capture so release is always detected (never stop player accidentally). */
 function MobileControlButton({
@@ -132,8 +151,8 @@ export function PakadKeDikhaoGame({ avatar, onBack, onGameComplete: _onGameCompl
   useEffect(() => {
     if (!gameStarted || gameState !== "playing") return;
     
-    const [initX, initY, initZ] = initialAvatarPosition.current;
-    const [currX, currY, currZ] = avatarPosition;
+    const [initX, , initZ] = initialAvatarPosition.current;
+    const [currX, , currZ] = avatarPosition;
     
     // Check if player has moved from initial position (threshold of 0.5 units)
     const distance = Math.sqrt(
@@ -246,7 +265,7 @@ export function PakadKeDikhaoGame({ avatar, onBack, onGameComplete: _onGameCompl
             avatarPosition={avatarPosition}
             onAvatarPositionChange={setAvatarPosition}
             followerCount={selectedFollowerCount}
-            followerAvatarTypes={FOLLOWER_AVATAR_TYPES}
+            followerAvatarTypes={getFollowerAvatarGroup(selectedFollowerCount)}
             onGameOver={handleGameOver}
             onFollowerDistanceChange={handleFollowerDistanceChange}
             direction={direction}
