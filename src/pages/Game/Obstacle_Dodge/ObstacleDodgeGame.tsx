@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ObstacleDodgeScene } from "./scenes/ObstacleDodgeScene";
+import { getButtonClasses } from "../../../utils/buttonStyles";
 import { AvatarType } from "../../../components/AvatarSelector";
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import { stopAllAudio, playBackgroundMusic } from "../../../utils/audio";
+import { Countdown } from "../../../components/Countdown";
 
 interface ObstacleDodgeGameProps {
   avatar: AvatarType;
@@ -22,6 +24,8 @@ export function ObstacleDodgeGame({ avatar, onBack }: ObstacleDodgeGameProps) {
   const [totalTime, setTotalTime] = useState(0);
   const [playerPosition, setPlayerPosition] = useState(0); // X position: -1, 0, or 1 (left, center, right lane)
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
+  const [showCountdown, setShowCountdown] = useState(true);
+  const [gameStarted, setGameStarted] = useState(false);
   const gameStartTime = useRef<number>(Date.now());
   const animationFrameRef = useRef<number>();
   const lastObstacleSpawnTime = useRef<number>(Date.now());
@@ -33,8 +37,18 @@ export function ObstacleDodgeGame({ avatar, onBack }: ObstacleDodgeGameProps) {
   const LANE_WIDTH = 2;
   const LANE_POSITIONS = [-LANE_WIDTH, 0, LANE_WIDTH];
 
+  // Handle countdown completion
+  const handleCountdownComplete = useCallback(() => {
+    setShowCountdown(false);
+    setGameStarted(true);
+    gameStartTime.current = Date.now();
+    playBackgroundMusic();
+  }, []);
+
   // Handle keyboard input for left/right movement
   useEffect(() => {
+    if (!gameStarted) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (["ArrowLeft", "ArrowRight", "a", "A", "d", "D"].includes(e.key)) {
         e.preventDefault();
@@ -66,7 +80,7 @@ export function ObstacleDodgeGame({ avatar, onBack }: ObstacleDodgeGameProps) {
       window.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("keyup", handleKeyUp, true);
     };
-  }, [gameState]);
+  }, [gameState, gameStarted]);
 
   const spawnObstacle = useCallback(() => {
     // Spawn only ONE obstacle in ONE random lane at a time
@@ -161,7 +175,7 @@ export function ObstacleDodgeGame({ avatar, onBack }: ObstacleDodgeGameProps) {
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [gameState, spawnObstacle]);
+  }, [gameState, gameStarted, spawnObstacle]);
 
   const playFailureSound = () => {
     // Create a failure sound using Web Audio API
@@ -209,24 +223,26 @@ export function ObstacleDodgeGame({ avatar, onBack }: ObstacleDodgeGameProps) {
     }
   }, [gameState, currentTime]);
 
-  // Start background music when component mounts
+  // Start background music only after countdown
   useEffect(() => {
-    playBackgroundMusic();
+    if (gameStarted) {
+      playBackgroundMusic();
+    }
 
     return () => {
       // Stop all audio when component unmounts (when navigating away)
       stopAllAudio();
     };
-  }, []);
+  }, [gameStarted]);
 
   const handleRestart = () => {
+    setShowCountdown(true);
+    setGameStarted(false);
     setGameState("playing");
     setCurrentTime(0);
     setTotalTime(0);
     setPlayerPosition(0);
     setObstacles([]);
-    gameStartTime.current = Date.now();
-    lastObstacleSpawnTime.current = Date.now();
     // Spawn initial obstacle in one lane on restart
     setTimeout(() => {
       const lane = Math.floor(Math.random() * 3);
@@ -322,21 +338,27 @@ export function ObstacleDodgeGame({ avatar, onBack }: ObstacleDodgeGameProps) {
 
   return (
     <div className="w-full h-screen bg-gradient-to-b from-gray-900 via-gray-800 to-black overflow-hidden">
+      {/* Countdown */}
+      {showCountdown && (
+        <Countdown onComplete={handleCountdownComplete} />
+      )}
       {/* 3D Scene */}
-      <div className="absolute inset-0">
-        <ObstacleDodgeScene
-          avatarType={avatar}
-          playerLane={playerPosition}
-          obstacles={obstacles}
-          onCollision={handleCollision}
-          onObstacleUpdate={handleObstacleUpdate}
-          gameState={gameState}
-        />
-      </div>
+      {gameStarted && (
+        <div className="absolute inset-0">
+          <ObstacleDodgeScene
+            avatarType={avatar}
+            playerLane={playerPosition}
+            obstacles={obstacles}
+            onCollision={handleCollision}
+            onObstacleUpdate={handleObstacleUpdate}
+            gameState={gameState}
+          />
+        </div>
+      )}
 
-      {/* Timer Display */}
+      {/* Timer Display - Below Logo */}
       {gameState === "playing" && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30">
+        <div className={`absolute ${isMobile ? 'top-12' : 'top-16'} left-1/2 transform -translate-x-1/2 z-30`}>
           <div className="bg-black/70 backdrop-blur-sm rounded-xl px-6 py-3 shadow-2xl border-2 border-yellow-400">
             <div className="text-yellow-400 text-sm font-semibold mb-1 text-center">Current Time</div>
             <div className="text-white text-3xl font-bold text-center font-mono">
@@ -360,13 +382,13 @@ export function ObstacleDodgeGame({ avatar, onBack }: ObstacleDodgeGameProps) {
               <div className="flex gap-4 justify-center">
                 <button
                   onClick={handleRestart}
-                  className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 active:scale-95"
+                  className={getButtonClasses('md')}
                 >
                   Restart
                 </button>
                 <button
                   onClick={onBack}
-                  className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all duration-200 active:scale-95"
+                  className={getButtonClasses('md')}
                 >
                   Back
                 </button>
@@ -376,25 +398,40 @@ export function ObstacleDodgeGame({ avatar, onBack }: ObstacleDodgeGameProps) {
         </div>
       )}
 
-      {/* Back Button */}
+      {/* Logo - Top Center */}
+      <div className={`absolute ${isMobile ? 'top-2' : 'top-4'} left-1/2 transform -translate-x-1/2 z-50`}>
+        <img 
+          src="/logo.png" 
+          alt="Khel Town Logo" 
+          className={`${isMobile ? 'h-6' : 'h-8'} w-auto object-contain opacity-60 hover:opacity-100 transition-opacity duration-200`}
+        />
+      </div>
+
+      {/* Back Button - Top Left */}
       {gameState === "playing" && (
-        <div className="absolute top-4 left-4 z-20">
+        <div className={`absolute ${isMobile ? 'top-2 left-2' : 'top-4 left-4'} z-40`}>
           <button
             onClick={onBack}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full shadow-lg transition-all duration-200 active:scale-95 flex items-center gap-2"
+            className={getButtonClasses('md', 'flex items-center gap-2')}
             aria-label="Back"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
             <span>Back</span>
           </button>
         </div>
       )}
 
-      {/* Controls Instructions */}
+      {/* Score/Rating - Top Right */}
       {gameState === "playing" && (
-        <div className={`absolute ${isMobile ? 'bottom-4 left-2 right-2' : 'bottom-4 left-4'} z-20`}>
+        <div className={`absolute ${isMobile ? 'top-2 right-2' : 'top-4 right-4'} z-40`}>
+          <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-2 shadow-lg">
+            <span className="text-sm sm:text-base font-bold text-gray-800">Time: {Math.floor(currentTime)}s</span>
+          </div>
+        </div>
+      )}
+
+      {/* Controls Instructions - Bottom Left */}
+      {gameState === "playing" && (
+        <div className={`absolute ${isMobile ? 'bottom-12 left-2' : 'bottom-16 left-4'} z-20`}>
           <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-2 shadow-lg">
             {isMobile ? (
               <div className="text-xs font-medium text-gray-700">
@@ -408,6 +445,7 @@ export function ObstacleDodgeGame({ avatar, onBack }: ObstacleDodgeGameProps) {
           </div>
         </div>
       )}
+
     </div>
   );
 }

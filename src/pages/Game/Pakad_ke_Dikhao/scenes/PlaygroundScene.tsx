@@ -100,6 +100,8 @@ interface PlaygroundSceneProps {
   onTouchGestureEnd?: (action: "up" | "down" | "left" | "right") => void;
   /** "follow" = third-person behind avatar, "top" = top-down view */
   cameraMode?: CameraMode;
+  /** Enable/disable follower movement - followers only start following after player moves */
+  enableFollower?: boolean;
 }
 
 /** Red warning circle indicator that appears below avatar when follower is near */
@@ -147,6 +149,7 @@ export function PlaygroundScene({
   onTouchGesture,
   onTouchGestureEnd,
   cameraMode = "follow",
+  enableFollower = true,
 }: PlaygroundSceneProps) {
   const isMobile = useIsMobile();
   const internalControls = useAvatarControls();
@@ -417,6 +420,14 @@ export function PlaygroundScene({
         const distance = Math.sqrt(dx * dx + dz * dz);
         newDistances.push(distance);
 
+        // Only move followers if enabled (player has started moving)
+        if (!enableFollower) {
+          // Keep followers in place, but still track distance for UI
+          newPositions.push(followerPos);
+          newRotations.push(followerRotationsRef.current[index] ?? 0);
+          continue;
+        }
+
         if (distance < 1.2) {
           queueMicrotask(() => onGameOver());
           newPositions.push(followerPos);
@@ -507,7 +518,7 @@ export function PlaygroundScene({
     }, 16);
 
     return () => clearInterval(interval);
-  }, [onGameOver, onFollowerDistanceChange, followerCount, obstacles]);
+  }, [onGameOver, onFollowerDistanceChange, followerCount, obstacles, enableFollower]);
 
   // Camera controller: follow (third-person) or top-down view
   function CameraController({

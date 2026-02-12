@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { LetterMatchScene } from "./scenes/LetterMatchScene";
+import { getButtonClasses } from "../../../utils/buttonStyles";
 import { LetterData } from "./components/LetterBox";
 import { Howl } from "howler";
 import { useIsMobile } from "../../../hooks/useIsMobile";
 import { usePlayer } from "../../../context/PlayerContext";
 import { addStar } from "../../../utils/storage";
+import { Countdown } from "../../../components/Countdown";
 
 interface LetterMatchGameProps {
   onBack: () => void;
@@ -109,6 +111,8 @@ export function LetterMatchGame({ onBack, onGameComplete }: LetterMatchGameProps
   const [stars, setStars] = useState(0);
   const [showCelebration, setShowCelebration] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
+  const [showCountdown, setShowCountdown] = useState(true);
+  const [gameStarted, setGameStarted] = useState(false);
 
   // Initialize game with random letters
   useEffect(() => {
@@ -121,12 +125,19 @@ export function LetterMatchGame({ onBack, onGameComplete }: LetterMatchGameProps
     setStars(0);
   }, []);
 
+  // Handle countdown completion
+  const handleCountdownComplete = useCallback(() => {
+    setShowCountdown(false);
+    setGameStarted(true);
+  }, []);
+
   // Check if game is completed
   const isGameComplete = matchedIds.length === letters.length && letters.length > 0;
 
   // Handle letter click
   const handleLetterClick = useCallback(
     (id: number) => {
+      if (!gameStarted) return;
       // Don't allow clicking matched letters
       if (matchedIds.includes(id)) return;
 
@@ -212,51 +223,51 @@ export function LetterMatchGame({ onBack, onGameComplete }: LetterMatchGameProps
 
   return (
     <div className="w-full h-screen bg-gradient-to-b from-blue-100 via-purple-100 to-pink-100 overflow-hidden relative">
+      {/* Countdown */}
+      {showCountdown && (
+        <Countdown onComplete={handleCountdownComplete} />
+      )}
       {/* 3D Scene */}
-      <div className="absolute inset-0">
-        <LetterMatchScene
-          letters={letters}
-          selectedId={selectedId}
-          matchedIds={matchedIds}
-          onLetterClick={handleLetterClick}
-          showCelebration={showCelebration}
-          onCelebrationComplete={() => setShowCelebration(false)}
-          isShaking={isShaking}
-          revealedIds={revealedIds}
-          matchedPairs={matchedPairs}
-          layoutType="hexagonal"
-        />
-      </div>
+      {gameStarted && (
+        <div className="absolute inset-0">
+          <LetterMatchScene
+            letters={letters}
+            selectedId={selectedId}
+            matchedIds={matchedIds}
+            onLetterClick={handleLetterClick}
+            showCelebration={showCelebration}
+            onCelebrationComplete={() => setShowCelebration(false)}
+            isShaking={isShaking}
+            revealedIds={revealedIds}
+            matchedPairs={matchedPairs}
+            layoutType="hexagonal"
+          />
+        </div>
+      )}
 
       {/* UI Overlay */}
-      <div className="absolute inset-0 z-10 pointer-events-none">
+      <div className="absolute inset-0 z-30 pointer-events-none">
         {/* Top HUD */}
         {/* Control Buttons - Top Left */}
-        <div className={`absolute ${isMobile ? 'top-2 left-2' : 'top-4 left-4'} flex ${isMobile ? 'gap-1' : 'gap-2'} pointer-events-auto`}>
+        <div className={`absolute ${isMobile ? 'top-2 left-2' : 'top-4 left-4'} flex ${isMobile ? 'gap-1' : 'gap-2'} pointer-events-auto z-40`}>
           <button
             onClick={onBack}
-            className={`bg-blue-500 hover:bg-blue-600 text-white font-bold ${isMobile ? 'py-1.5 px-2 text-sm' : 'py-2 px-4'} rounded-full shadow-lg transition-all duration-200 active:scale-95 flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`}
+            className={getButtonClasses(isMobile ? 'sm' : 'md', `flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`)}
             aria-label="Back"
           >
-            <svg className={isMobile ? "w-4 h-4" : "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
             {!isMobile && <span>Back</span>}
           </button>
           <button
             onClick={handleReset}
-            className={`bg-red-500 hover:bg-red-600 text-white font-bold ${isMobile ? 'py-1.5 px-2 text-sm' : 'py-2 px-4'} rounded-full shadow-lg transition-all duration-200 active:scale-95 flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`}
+            className={getButtonClasses(isMobile ? 'sm' : 'md', `flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`)}
             aria-label="Reset Game"
           >
-            <svg className={isMobile ? "w-4 h-4" : "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
             {!isMobile && <span>Reset</span>}
           </button>
         </div>
 
         {/* Star Counter - Top Right */}
-        <div className={`absolute ${isMobile ? 'top-2 right-2' : 'top-4 right-4'} pointer-events-auto`}>
+        <div className={`absolute ${isMobile ? 'top-2 right-2' : 'top-4 right-4'} pointer-events-auto z-40`}>
           <div className="bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg flex items-center gap-2">
             <svg className="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -307,6 +318,15 @@ export function LetterMatchGame({ onBack, onGameComplete }: LetterMatchGameProps
       {isShaking && (
         <div className="absolute inset-0 bg-red-500/10 animate-pulse pointer-events-none" />
       )}
+
+      {/* Logo - Top Center */}
+      <div className={`absolute ${isMobile ? 'top-2' : 'top-4'} left-1/2 transform -translate-x-1/2 z-50`}>
+        <img 
+          src="/logo.png" 
+          alt="Khel Town Logo" 
+          className={`${isMobile ? 'h-6' : 'h-8'} w-auto object-contain opacity-60 hover:opacity-100 transition-opacity duration-200`}
+        />
+      </div>
     </div>
   );
 }

@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { AlphabetStreet } from "./scenes/AlphabetStreet";
+import { getButtonClasses, BUTTON_MEDIUM } from "../../../utils/buttonStyles";
+import { Countdown } from "../../../components/Countdown";
 import { THEME_CONFIG } from "./scenes/AlphabetStreet";
 import { HUD } from "../../../ui/HUD";
 import { PromptDisplay } from "./components/PromptDisplay";
@@ -66,11 +68,15 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
   const [showTooFarMessage, setShowTooFarMessage] = useState(false);
   const [boxPositions, setBoxPositions] = useState<Map<string, [number, number, number]>>(new Map());
   const [shuffleKey, setShuffleKey] = useState(0);
-  const [sceneTheme, setSceneTheme] = useState<SceneThemeId>(() => pickRandomTheme());
+  const [sceneTheme, setSceneTheme] = useState<SceneThemeId>("jungle");
   const [roundNumber, setRoundNumber] = useState(1);
   const [showRoundOverlay, setShowRoundOverlay] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [followerDistance, setFollowerDistance] = useState<number | null>(null);
+  const [showCountdown, setShowCountdown] = useState(true);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [hasPlayerMoved, setHasPlayerMoved] = useState(false);
+  const initialAvatarPosition = useRef<[number, number, number]>([0, 0, -20]);
 
   // Get current content based on mode
   const currentContent = getContentForMode(currentMode);
@@ -88,6 +94,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
 
   // Generate random prompt when mode changes or when no prompt exists
   useEffect(() => {
+    if (!gameStarted) return;
     if (currentMode === "alphabet") {
       if (availableItems.length > 0 && !promptItem) {
         const randomIndex = Math.floor(Math.random() * availableItems.length);
@@ -99,7 +106,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
         playPhonicsAudio("", "Congratulations! You completed all letters!");
       }
     }
-  }, [currentMode, availableItems.length, promptItem]);
+  }, [currentMode, availableItems.length, promptItem, gameStarted]);
 
   // Reset when mode changes
   useEffect(() => {
@@ -107,20 +114,51 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
     setShowStar(false);
     stopAllAudio();
     setAvatarPosition([0, 0, -20]);
+    initialAvatarPosition.current = [0, 0, -20];
+    setHasPlayerMoved(false);
   }, [currentMode]);
 
-  // Start background music when component mounts
-  useEffect(() => {
+  // Handle countdown completion
+  const handleCountdownComplete = useCallback(() => {
+    setShowCountdown(false);
+    setGameStarted(true);
+    setHasPlayerMoved(false);
+    initialAvatarPosition.current = [0, 0, -20];
     playBackgroundMusic();
+  }, []);
+
+  // Track avatar position changes to detect when player starts moving
+  useEffect(() => {
+    if (!gameStarted) return;
+    
+    const [initX, initY, initZ] = initialAvatarPosition.current;
+    const [currX, currY, currZ] = avatarPosition;
+    
+    // Check if player has moved from initial position (threshold of 0.5 units)
+    const distance = Math.sqrt(
+      Math.pow(currX - initX, 2) + 
+      Math.pow(currZ - initZ, 2)
+    );
+    
+    if (distance > 0.5 && !hasPlayerMoved) {
+      setHasPlayerMoved(true);
+    }
+  }, [avatarPosition, gameStarted, hasPlayerMoved]);
+
+  // Start background music only after countdown
+  useEffect(() => {
+    if (gameStarted) {
+      playBackgroundMusic();
+    }
 
     return () => {
       // Stop all audio when component unmounts (when navigating away)
       stopAllAudio();
     };
-  }, []);
+  }, [gameStarted]);
 
   const handleItemClick = useCallback((item: LearningItem, itemPosition: [number, number, number]) => {
-    if (!promptItem) return;
+    if (!gameStarted || !promptItem) return;
 
     const distance = Math.sqrt(
       Math.pow(itemPosition[0] - avatarPosition[0], 2) +
@@ -196,6 +234,8 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
       setCurrentItem(null);
       setShowStar(false);
       setAvatarPosition([0, 0, -20]);
+      initialAvatarPosition.current = [0, 0, -20];
+      setHasPlayerMoved(false);
       setShowSuccess(false);
       setPromptItem(null);
       setShuffleKey(prev => prev + 1);
@@ -242,6 +282,8 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
     setCurrentItem(null);
     setShowStar(false);
     setAvatarPosition([0, 0, -20]);
+    initialAvatarPosition.current = [0, 0, -20];
+    setHasPlayerMoved(false);
     setShowSuccess(false);
     setPromptItem(null);
     setShuffleKey(prev => prev + 1);
@@ -272,6 +314,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
   }>({ action: null, timeout: null, isHolding: false });
   
   const handleTouchGesture = useCallback((action: "up" | "down" | "left" | "right") => {
+    if (!gameStarted) return;
     // Clear any existing timeout
     if (touchGestureRef.current.timeout) {
       clearTimeout(touchGestureRef.current.timeout);
@@ -301,7 +344,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
         touchGestureRef.current.action = null;
       }, 50);
     }
-  }, [handleTouchStart, handleTouchEnd]);
+  }, [handleTouchStart, handleTouchEnd, gameStarted]);
 
   // Handle touch end to stop forward movement
   useEffect(() => {
@@ -341,6 +384,10 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
 
   return (
     <div className="w-full h-screen overflow-hidden" style={skyStyle}>
+      {/* Countdown */}
+      {showCountdown && (
+        <Countdown onComplete={handleCountdownComplete} />
+      )}
       {/* Round overlay: show round number + option to change theme, then Next */}
       {showRoundOverlay && (
         <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/30 backdrop-blur-sm">
@@ -355,7 +402,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
               <button
                 type="button"
                 onClick={handleChangeTheme}
-                className="bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                className={getButtonClasses('md', 'flex items-center justify-center gap-2')}
                 aria-label="Change theme"
               >
                 <span aria-hidden>🎨</span>
@@ -364,7 +411,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
               <button
                 type="button"
                 onClick={handleRoundNext}
-                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all active:scale-95"
+                className={getButtonClasses('md')}
                 aria-label="Next"
               >
                 Next
@@ -375,38 +422,40 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
       )}
 
       {/* 3D Scene - theme changes each time game starts */}
-      <div className="absolute inset-0">
-        <AlphabetStreet
-          sceneTheme={sceneTheme}
-          items={currentContent}
-          onItemClick={handleItemClick}
-          showStar={showStar}
-          starPosition={starPosition}
-          onStarComplete={handleStarComplete}
-          showObject={false}
-          objectPosition={null}
-          objectModelPath={null}
-          avatarType={avatar}
-          avatarTarget={null}
-          onAvatarReachTarget={() => { }}
-          completedItems={completedItems}
-          avatarPosition={avatarPosition}
-          onBoxPositionsUpdate={setBoxPositions}
-          shuffleKey={shuffleKey}
-          currentMode={currentMode}
-          boxPositions={boxPositions}
-          completedItemsForCollision={completedItems}
-          onAvatarPositionChange={setAvatarPosition}
-          direction={direction}
-          rotationDirection={rotationDirection}
+      {gameStarted && (
+        <div className="absolute inset-0">
+          <AlphabetStreet
+            sceneTheme={sceneTheme}
+            items={currentContent}
+            onItemClick={handleItemClick}
+            showStar={showStar}
+            starPosition={starPosition}
+            onStarComplete={handleStarComplete}
+            showObject={false}
+            objectPosition={null}
+            objectModelPath={null}
+            avatarType={avatar}
+            avatarTarget={null}
+            onAvatarReachTarget={() => { }}
+            completedItems={completedItems}
+            avatarPosition={avatarPosition}
+            onBoxPositionsUpdate={setBoxPositions}
+            shuffleKey={shuffleKey}
+            currentMode={currentMode}
+            boxPositions={boxPositions}
+            completedItemsForCollision={completedItems}
+            onAvatarPositionChange={setAvatarPosition}
+            direction={direction}
+            rotationDirection={rotationDirection}
           isMoving={isMoving}
           onTouchGesture={isMobile ? handleTouchGesture : undefined}
           onGameOver={handleGameOver}
-          enableFollower={true}
+          enableFollower={hasPlayerMoved}
           onFollowerDistanceChange={handleFollowerDistanceChange}
           isGameActive={!showRoundOverlay && !gameOver}
         />
-      </div>
+        </div>
+      )}
 
       {/* Prompt Display */}
       {currentMode === "alphabet" && (
@@ -496,13 +545,13 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
             <div className="flex flex-col gap-3">
               <button
                 onClick={handleRestartAfterGameOver}
-                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95"
+                className={getButtonClasses('md')}
               >
                 Try Again
               </button>
               <button
                 onClick={handleBack}
-                className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-xl shadow-lg transition-all active:scale-95"
+                className={getButtonClasses('md')}
               >
                 Back to Menu
               </button>
@@ -512,26 +561,20 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
       )}
 
       {/* Reset Game and Home Buttons */}
-      <div className={`absolute ${isMobile ? 'top-2 left-2' : 'top-4 left-4'} z-20 flex ${isMobile ? 'gap-1' : 'gap-2'}`}>
+      <div className={`absolute ${isMobile ? 'top-2 left-2' : 'top-4 left-4'} z-40 flex ${isMobile ? 'gap-1' : 'gap-2'}`}>
         <button
           onClick={handleBack}
-          className={`bg-blue-500 hover:bg-blue-600 text-white font-bold ${isMobile ? 'py-1.5 px-2 text-sm' : 'py-2 px-4'} rounded-full shadow-lg transition-all duration-200 active:scale-95 flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`}
+          className={getButtonClasses(isMobile ? 'sm' : 'md', `flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`)}
           aria-label="Back"
         >
-          <svg className={isMobile ? "w-4 h-4" : "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
           {!isMobile && <span>Back</span>}
         </button>
         <button
           onClick={handleResetGame}
-          className={`bg-red-500 hover:bg-red-600 text-white font-bold ${isMobile ? 'py-1.5 px-2 text-sm' : 'py-2 px-4'} rounded-full shadow-lg transition-all duration-200 active:scale-95 flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`}
+          className={getButtonClasses(isMobile ? 'sm' : 'md', `flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`)}
           aria-label="Reset Game"
         >
-          <svg className={isMobile ? "w-4 h-4" : "w-5 h-5"} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          {!isMobile && <span>Reset Game</span>}
+          {!isMobile && <span>Reset</span>}
         </button>
       </div>
 
@@ -539,7 +582,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
       <div className={`absolute ${isMobile ? 'bottom-24 right-3' : 'bottom-6 right-4'} z-30`}>
         <button
           onClick={handleChangeTheme}
-          className={`bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold ${isMobile ? 'w-14 h-14' : 'py-3 px-4'} rounded-full shadow-xl transition-all duration-200 active:scale-95 flex items-center justify-center ${isMobile ? '' : 'gap-2'} touch-manipulation`}
+          className={getButtonClasses(isMobile ? 'w-14 h-14' : 'md', `flex items-center justify-center ${isMobile ? '' : 'gap-2'}`)}
           aria-label="Change Theme"
           title="Change view"
         >
@@ -548,19 +591,48 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
         </button>
       </div>
 
-      {/* HUD Overlay */}
-      <HUD
-        stars={stars}
-        currentItem={currentItem}
-        onRepeat={() => { }}
-        progress={progress}
-        totalItems={currentContent.length}
-        mode={currentMode}
-      />
+      {/* Logo - Top Center */}
+      <div className={`absolute ${isMobile ? 'top-2' : 'top-4'} left-1/2 transform -translate-x-1/2 z-50`}>
+        <img 
+          src="/logo.png" 
+          alt="Khel Town Logo" 
+          className={`${isMobile ? 'h-6' : 'h-8'} w-auto object-contain opacity-60 hover:opacity-100 transition-opacity duration-200`}
+        />
+      </div>
 
-      {/* Controls Instructions */}
+      {/* Rating/Score - Top Right */}
+      <div className={`absolute ${isMobile ? 'top-2 right-2' : 'top-4 right-4'} z-40`}>
+        {currentMode !== "alphabet" && (
+          <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-2 shadow-lg">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
+            <span className="text-xl sm:text-2xl font-bold text-gray-800">{stars}</span>
+          </div>
+        )}
+      </div>
+
+      {/* HUD Overlay - Center for current item display */}
+      {currentItem && (
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+            <div className="bg-white/95 backdrop-blur-sm rounded-2xl px-6 py-4 shadow-xl">
+              <div className="text-center">
+                <div className="text-6xl md:text-8xl font-bold mb-2" style={{ color: currentItem.color }}>
+                  {currentItem.label}
+                </div>
+                <div className="text-2xl md:text-3xl font-semibold text-gray-800">
+                  {currentMode === "alphabet" ? `for ${currentItem.word}` : `is ${currentItem.word}`}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Controls Instructions - Bottom Left */}
       {currentMode === "alphabet" && (
-        <div className={`absolute ${isMobile ? 'top-16 left-2' : 'top-20 left-4'} z-20`}>
+        <div className={`absolute ${isMobile ? 'bottom-12 left-2' : 'bottom-16 left-4'} z-20`}>
           <div className={`bg-white/90 backdrop-blur-sm rounded-lg ${isMobile ? 'px-2 py-1' : 'px-3 py-1.5'} shadow-lg`}>
             {isMobile ? (
               <>
@@ -595,18 +667,21 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
             <div className="grid grid-cols-3 gap-0.5">
               <div></div>
               <button
+                disabled={!gameStarted}
                 onTouchStart={(e) => {
+                  if (!gameStarted) return;
                   e?.stopPropagation();
                   handleTouchStart("up");
                 }}
                 onTouchEnd={(e) => {
+                  if (!gameStarted) return;
                   e?.stopPropagation();
                   handleTouchEnd("up");
                 }}
                 // onMouseDown={() => handleTouchStart("up")}
                 // onMouseUp={() => handleTouchEnd("up")}
                 // onMouseLeave={() => handleTouchEnd("up")}
-                className="bg-blue-500 active:bg-blue-600 text-white rounded-lg p-3 shadow-lg touch-manipulation select-none"
+                className={`${gameStarted ? 'bg-blue-500 active:bg-blue-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg p-3 shadow-lg touch-manipulation select-none`}
                 aria-label="Move Forward"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -616,18 +691,21 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
               <div></div>
 
               <button
+                disabled={!gameStarted}
                 onTouchStart={(e) => {
+                  if (!gameStarted) return;
                   e.stopPropagation();
                   handleTouchStart("left");
                 }}
                 onTouchEnd={(e) => {
+                  if (!gameStarted) return;
                   e.stopPropagation();
                   handleTouchEnd("left");
                 }}
                 // onMouseDown={() => handleTouchStart("left")}
                 // onMouseUp={() => handleTouchEnd("left")}
                 // onMouseLeave={() => handleTouchEnd("left")}
-                className="bg-blue-500 active:bg-blue-600 text-white rounded-lg p-3 shadow-lg touch-manipulation select-none"
+                className={`${gameStarted ? 'bg-blue-500 active:bg-blue-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg p-3 shadow-lg touch-manipulation select-none`}
                 aria-label="Turn Left"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -635,18 +713,21 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
                 </svg>
               </button>
               <button
+                disabled={!gameStarted}
                 onTouchStart={(e) => {
+                  if (!gameStarted) return;
                   e.stopPropagation();
                   handleTouchStart("down");
                 }}
                 onTouchEnd={(e) => {
+                  if (!gameStarted) return;
                   e.stopPropagation();
                   handleTouchEnd("down");
                 }}
                 // onMouseDown={() => handleTouchStart("down")}
                 // onMouseUp={() => handleTouchEnd("down")}
                 // onMouseLeave={() => handleTouchEnd("down")}
-                className="bg-blue-500 active:bg-blue-600 text-white rounded-lg p-3 shadow-lg touch-manipulation select-none"
+                className={`${gameStarted ? 'bg-blue-500 active:bg-blue-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg p-3 shadow-lg touch-manipulation select-none`}
                 aria-label="Turn Around"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -654,18 +735,21 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
                 </svg>
               </button>
               <button
+                disabled={!gameStarted}
                 onTouchStart={(e) => {
+                  if (!gameStarted) return;
                   e.stopPropagation();
                   handleTouchStart("right");
                 }}
                 onTouchEnd={(e) => {
+                  if (!gameStarted) return;
                   e.stopPropagation();
                   handleTouchEnd("right");
                 }}
                 // onMouseDown={() => handleTouchStart("right")}
                 // onMouseUp={() => handleTouchEnd("right")}
                 // onMouseLeave={() => handleTouchEnd("right")}
-                className="bg-blue-500 active:bg-blue-600 text-white rounded-lg p-3 shadow-lg touch-manipulation select-none"
+                className={`${gameStarted ? 'bg-blue-500 active:bg-blue-600' : 'bg-gray-400 cursor-not-allowed'} text-white rounded-lg p-3 shadow-lg touch-manipulation select-none`}
                 aria-label="Turn Right"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -676,6 +760,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
           </div>
         </div>
       )}
+
     </div>
   );
 }

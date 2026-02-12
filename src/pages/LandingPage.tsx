@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AvatarType } from "../components/AvatarSelector";
 import { usePlayer } from "../context/PlayerContext";
+import { Header } from "../components/Header";
+import { Footer } from "../components/Footer";
+import { BUTTON_FULL_WIDTH } from "../utils/buttonStyles";
 
 export function LandingPage() {
   const navigate = useNavigate();
@@ -25,85 +28,163 @@ export function LandingPage() {
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-b from-blue-100 via-purple-100 to-pink-100 overflow-y-auto">
-      <div className="bg-white/95 backdrop-blur-sm rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 lg:p-12 shadow-2xl max-w-2xl w-full mx-2 sm:mx-4 my-4 sm:my-8">
-        <div className="text-center mb-4 sm:mb-6 md:mb-8">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-1 sm:mb-2">
-            Welcome to Khel! 🎮
-          </h1>
-          <p className="text-sm sm:text-base md:text-lg text-gray-600 px-2">
-            Enter your name and choose your avatar to begin
-          </p>
-        </div>
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
+        <div className="absolute top-40 right-10 w-72 h-72 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div className="absolute -bottom-8 left-1/2 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
-          {/* Name Input */}
-          <div>
-            <label htmlFor="name" className="block text-sm sm:text-base md:text-lg font-semibold text-gray-700 mb-1 sm:mb-2">
-              Your Name:
-            </label>
-            <input
-              id="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your name"
-              className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border-2 border-gray-300 focus:border-blue-500 focus:outline-none text-base sm:text-lg touch-manipulation"
-              required
-              autoFocus
-            />
-          </div>
+      <div className="relative min-h-screen flex flex-col p-4 pb-0 sm:p-6 sm:pb-0 md:p-8 md:pb-0">
+        <div className="w-full max-w-4xl mx-auto flex-1 flex flex-col">
+          {/* Header Component */}
+          <Header />
 
-          {/* Avatar Selection */}
-          <div>
-            <label className="block text-sm sm:text-base md:text-lg font-semibold text-gray-700 mb-3 sm:mb-4">
-              Choose Your Avatar:
-            </label>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-4">
-              {avatarOptions.map((avatar) => (
+          {/* Main Card - Sticks to bottom on all screens */}
+          <div className="flex-1 w-full flex flex-col mt-auto">
+            <div className="bg-white/80 backdrop-blur-lg rounded-t-3xl shadow-2xl border border-white/20 border-b-0 p-6 sm:p-8 md:p-10 lg:p-12 flex-1 flex flex-col">
+            <form onSubmit={handleSubmit} className="flex-1 flex flex-col space-y-6 sm:space-y-8">
+              {/* Name Input Section */}
+              <div className="space-y-2">
+                <label htmlFor="name" className="block text-sm sm:text-base font-bold text-gray-700">
+                  <span className="flex items-center gap-2">
+                    <span className="text-xl">👤</span>
+                    Enter Your Name
+                  </span>
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="What should we call you?"
+                  className="w-full px-4 sm:px-5 py-3 sm:py-4 rounded-2xl border-2 border-gray-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-200 focus:outline-none text-base sm:text-lg font-medium transition-all duration-200 touch-manipulation bg-white/50"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              {/* Avatar Selection Section */}
+              <div className="space-y-4">
+                <label className="block text-sm sm:text-base font-bold text-gray-700">
+                  <span className="flex items-center gap-2">
+                    <span className="text-xl">🎭</span>
+                    Choose Your Avatar
+                  </span>
+                </label>
+                <div className="grid grid-cols-3 gap-3 sm:gap-4 md:gap-6">
+                  {avatarOptions.map((avatar) => (
+                    <button
+                      key={avatar.id}
+                      type="button"
+                      onClick={() => setSelectedAvatar(avatar.id)}
+                      className={`
+                        relative flex flex-col items-center justify-center
+                        p-4 sm:p-5 md:p-6 rounded-2xl sm:rounded-3xl
+                        border-3 transition-all duration-300
+                        transform hover:scale-105 active:scale-95 touch-manipulation
+                        overflow-hidden group
+                        ${
+                          selectedAvatar === avatar.id
+                            ? "shadow-xl"
+                            : "border-gray-200 hover:border-gray-300 bg-white/50 hover:bg-white"
+                        }
+                      `}
+                      style={{
+                        borderColor: selectedAvatar === avatar.id ? avatar.color : undefined,
+                        backgroundColor: selectedAvatar === avatar.id ? `${avatar.color}10` : undefined,
+                        boxShadow: selectedAvatar === avatar.id ? `0 0 0 4px ${avatar.color}40, 0 20px 25px -5px rgba(0, 0, 0, 0.1)` : undefined,
+                      }}
+                    >
+                      {/* Selection Indicator */}
+                      {selectedAvatar === avatar.id && (
+                        <div className="absolute top-2 right-2 bg-white rounded-full p-1 shadow-lg">
+                          <svg className="w-5 h-5" style={{ color: avatar.color }} fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      )}
+                      
+                      {/* Avatar Emoji */}
+                      <div className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl mb-2 sm:mb-3 transform group-hover:scale-110 transition-transform duration-300">
+                        {avatar.emoji}
+                      </div>
+                      
+                      {/* Avatar Name */}
+                      <div className={`text-sm sm:text-base md:text-lg font-bold ${
+                        selectedAvatar === avatar.id ? 'text-gray-800' : 'text-gray-600'
+                      }`}>
+                        {avatar.name}
+                      </div>
+                      
+                      {/* Hover Effect */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/0 to-white/0 group-hover:from-white/20 group-hover:to-transparent transition-all duration-300 rounded-2xl sm:rounded-3xl"></div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="pt-4 mt-auto">
                 <button
-                  key={avatar.id}
-                  type="button"
-                  onClick={() => setSelectedAvatar(avatar.id)}
-                  className={`
-                    flex flex-col items-center justify-center
-                    p-3 sm:p-4 md:p-6 rounded-xl sm:rounded-2xl
-                    border-2 sm:border-4 transition-all duration-300
-                    transform active:scale-95 touch-manipulation
-                    ${
-                      selectedAvatar === avatar.id
-                        ? "shadow-lg"
-                        : "border-gray-200 active:border-gray-300 bg-white"
-                    }
-                  `}
-                  style={{
-                    borderColor: selectedAvatar === avatar.id ? avatar.color : undefined,
-                    backgroundColor: selectedAvatar === avatar.id ? `${avatar.color}15` : undefined,
-                  }}
+                  type="submit"
+                  disabled={!name.trim()}
+                  className={`${BUTTON_FULL_WIDTH} sm:py-5 sm:px-8 text-lg sm:text-xl md:text-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:hover:scale-100 flex items-center justify-center gap-3`}
                 >
-                  <div className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl mb-1 sm:mb-2 md:mb-3">{avatar.emoji}</div>
-                  <div className="text-xs sm:text-sm md:text-base lg:text-lg font-bold text-gray-800">{avatar.name}</div>
-                  {selectedAvatar === avatar.id && (
-                    <div className="mt-1 sm:mt-2 text-[10px] sm:text-xs text-gray-600">✓ Selected</div>
-                  )}
+                  <span>Start Playing</span>
+                  <svg className="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
                 </button>
-              ))}
+              </div>
+            </form>
+
+            {/* Footer Component */}
+            <Footer />
             </div>
           </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={!name.trim()}
-            className="w-full bg-gradient-to-r from-blue-500 to-purple-600 active:from-blue-600 active:to-purple-700 
-                     text-white font-bold py-3 sm:py-3.5 md:py-4 px-4 sm:px-5 md:px-6 rounded-xl text-base sm:text-lg md:text-xl shadow-lg 
-                     transition-all duration-300 transform active:scale-95 touch-manipulation
-                     disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            Continue to Games →
-          </button>
-        </form>
+        </div>
       </div>
+
+      <style>{`
+        @keyframes blob {
+          0% {
+            transform: translate(0px, 0px) scale(1);
+          }
+          33% {
+            transform: translate(30px, -50px) scale(1.1);
+          }
+          66% {
+            transform: translate(-20px, 20px) scale(0.9);
+          }
+          100% {
+            transform: translate(0px, 0px) scale(1);
+          }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out;
+        }
+      `}</style>
     </div>
   );
 }
