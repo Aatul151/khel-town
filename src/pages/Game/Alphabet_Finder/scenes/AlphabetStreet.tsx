@@ -189,6 +189,8 @@ interface AlphabetStreetProps {
   enableFollower?: boolean; // Enable/disable follower
   onFollowerDistanceChange?: (distance: number) => void; // Report distance for warning UI
   isGameActive?: boolean; // Whether game is active (not in overlay)
+  onFollowerPositionChange?: (position: [number, number, number]) => void; // Report follower position for minimap
+  onAvatarRotationChange?: (rotation: number) => void; // Report avatar rotation for minimap
 }
 
 export function AlphabetStreet({
@@ -220,6 +222,8 @@ export function AlphabetStreet({
   enableFollower = true,
   onFollowerDistanceChange,
   isGameActive = true,
+  onFollowerPositionChange,
+  onAvatarRotationChange,
 }: AlphabetStreetProps) {
   const themeConfig = THEME_CONFIG[sceneTheme];
   // Navigation management - use external controls if provided, otherwise use internal hook
@@ -388,6 +392,13 @@ export function AlphabetStreet({
     }
   }, [internalAvatarPosition, onAvatarPositionChange]);
 
+  // Notify parent of avatar rotation changes for minimap
+  useEffect(() => {
+    if (onAvatarRotationChange) {
+      onAvatarRotationChange(internalAvatarRotation);
+    }
+  }, [internalAvatarRotation, onAvatarRotationChange]);
+
   // Reset position when shuffleKey changes (game reset)
   useEffect(() => {
     setInternalAvatarPosition([0, 0, -20]);
@@ -468,6 +479,16 @@ export function AlphabetStreet({
 
     return () => clearInterval(interval);
   }, [avatarPosition, enableFollower, onGameOver, currentMode, completedItems.length, isGameActive, onFollowerDistanceChange]);
+
+  // Notify parent of follower position changes for minimap
+  useEffect(() => {
+    if (onFollowerPositionChange) {
+      // Use queueMicrotask to avoid setState during render
+      queueMicrotask(() => {
+        onFollowerPositionChange(followerPosition);
+      });
+    }
+  }, [followerPosition, onFollowerPositionChange]);
 
   // Touch gesture handlers for mobile swipe navigation
   // Touch and hold = continuous forward movement

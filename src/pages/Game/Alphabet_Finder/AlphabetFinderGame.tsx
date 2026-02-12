@@ -76,6 +76,8 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
   const [gameStarted, setGameStarted] = useState(false);
   const [hasPlayerMoved, setHasPlayerMoved] = useState(false);
   const initialAvatarPosition = useRef<[number, number, number]>([0, 0, -20]);
+  const [followerPosition, setFollowerPosition] = useState<[number, number, number]>([0, 0, -30]);
+  const [avatarRotation, setAvatarRotation] = useState<number>(0);
 
   // Get current content based on mode
   const currentContent = getContentForMode(currentMode);
@@ -123,6 +125,8 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
     setGameStarted(true);
     setHasPlayerMoved(false);
     initialAvatarPosition.current = [0, 0, -20];
+    setFollowerPosition([0, 0, -30]);
+    setAvatarRotation(0);
     playBackgroundMusic();
   }, []);
 
@@ -238,11 +242,13 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
       setShowSuccess(false);
       setPromptItem(null);
       setShuffleKey(prev => prev + 1);
-      setSceneTheme(pickRandomTheme());
+      setSceneTheme("jungle");
       setRoundNumber(prev => prev + 1);
       // setShowRoundOverlay(true);
       setGameOver(false);
       setFollowerDistance(null);
+      setFollowerPosition([0, 0, -30]);
+      setAvatarRotation(0);
       stopAllAudio();
       playBackgroundMusic();
     }
@@ -286,8 +292,10 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
     setShowSuccess(false);
     setPromptItem(null);
     setShuffleKey(prev => prev + 1);
-    setSceneTheme(pickRandomTheme());
+    setSceneTheme("jungle");
     setRoundNumber(prev => prev + 1);
+    setFollowerPosition([0, 0, -30]);
+    setAvatarRotation(0);
     // setShowRoundOverlay(true);
     stopAllAudio();
     playBackgroundMusic();
@@ -452,6 +460,8 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
           enableFollower={hasPlayerMoved}
           onFollowerDistanceChange={handleFollowerDistanceChange}
           isGameActive={!showRoundOverlay && !gameOver}
+          onFollowerPositionChange={setFollowerPosition}
+          onAvatarRotationChange={setAvatarRotation}
         />
         </div>
       )}
@@ -522,6 +532,67 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
             </div>
             <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-center mt-1`}>
               Distance: {followerDistance.toFixed(1)}m
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Minimap - Live top-down view */}
+      {gameStarted && !gameOver && !showRoundOverlay && (
+        <div
+          className={`absolute z-30 right-3 ${isMobile ? "" : "bottom-24"}`}
+          style={isMobile ? { bottom: "calc(max(1rem, env(safe-area-inset-bottom, 0px) + 0.5rem) + 4rem)" } : undefined}
+        >
+          <div className="bg-black/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 p-2">
+            <div className={`${isMobile ? "w-24 h-24" : "w-32 h-32"} relative`}>
+              <svg
+                viewBox="-30 -30 60 60"
+                className="w-full h-full"
+                style={{ transform: "scaleY(-1)" }}
+              >
+                {/* Grid bounds indicator */}
+                <rect
+                  x="-27"
+                  y="-27"
+                  width="54"
+                  height="54"
+                  fill="rgba(255, 255, 255, 0.05)"
+                  stroke="rgba(255, 255, 255, 0.3)"
+                  strokeWidth="0.5"
+                />
+                
+                {/* Follower */}
+                <circle
+                  cx={followerPosition[0]}
+                  cy={followerPosition[2]}
+                  r="2"
+                  fill="#ef4444"
+                  stroke="#ffffff"
+                  strokeWidth="0.5"
+                  opacity="0.9"
+                />
+                
+                {/* Avatar */}
+                <circle
+                  cx={avatarPosition[0]}
+                  cy={avatarPosition[2]}
+                  r="2.5"
+                  fill="#10b981"
+                  stroke="#ffffff"
+                  strokeWidth="1"
+                />
+                
+                {/* Avatar direction indicator */}
+                <line
+                  x1={avatarPosition[0]}
+                  y1={avatarPosition[2]}
+                  x2={avatarPosition[0] + Math.sin(avatarRotation) * 5}
+                  y2={avatarPosition[2] + Math.cos(avatarRotation) * 5}
+                  stroke="#10b981"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
             </div>
           </div>
         </div>
