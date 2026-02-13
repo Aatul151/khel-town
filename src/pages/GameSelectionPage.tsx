@@ -39,22 +39,26 @@ export function GameSelectionPage({
       </div>
 
       <div className="relative min-h-screen flex flex-col p-4 pb-0 sm:p-6 sm:pb-0 md:p-8 md:pb-0">
+        {/* Back Button - Top Right */}
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10">
+          <button
+            onClick={onBack}
+            className={getButtonClasses('sm', 'flex items-center gap-1.5')}
+            aria-label="Go back"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            <span className="hidden sm:inline">Back</span>
+          </button>
+        </div>
+
         <div className="w-full max-w-6xl mx-auto flex-1 flex flex-col">
           {/* Header Component */}
           <Header 
             title={`Welcome, ${playerName}! 👋`}
             subtitle="Choose a game to play"
           />
-
-          {/* Home Button - Above Main Card */}
-          <div className="flex justify-center mb-4 sm:mb-5">
-            <button
-              onClick={onBack}
-              className={getButtonClasses('md', 'flex items-center gap-2')}
-            >
-              <span>Home</span>
-            </button>
-          </div>
 
           {/* Main Card - Sticks to bottom */}
           <div className="flex-1 w-full flex flex-col mt-auto">

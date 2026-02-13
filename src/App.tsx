@@ -8,6 +8,9 @@ import { ObstacleDodgeRoute } from "./pages/Game/Obstacle_Dodge/ObstacleDodgeRou
 import { PakadKeDikhaoRoute } from "./pages/Game/Pakad_ke_Dikhao/PakadKeDikhaoRoute";
 import { BhulBhalaiyaRoute } from "./pages/Game/Bhul_Bhalaiya/BhulBhalaiyaRoute";
 import { PrivacyPolicy } from "./pages/PrivacyPolicy";
+import { TermsOfService } from "./pages/TermsOfService";
+import { About } from "./pages/About";
+import { HowToPlay } from "./pages/HowToPlay";
 
 function App() {
   return (
@@ -22,6 +25,9 @@ function App() {
           <Route path="/game/pakad-ke-dikhao" element={<PakadKeDikhaoRoute />} />
           <Route path="/game/bhul-bhalaiya" element={<BhulBhalaiyaRoute />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/how-to-play" element={<HowToPlay />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

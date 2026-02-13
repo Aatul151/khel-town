@@ -1,0 +1,6 @@
+# Khel Town - Allow all crawlers (global access)
+User-agent: *
+Allow: /
+
+# Sitemap for Google and other search engines
+Sitemap: https://kheltown.in/sitemap.xml

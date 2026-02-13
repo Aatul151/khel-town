@@ -12,6 +12,7 @@ import { useIsMobile } from "../../../hooks/useIsMobile";
 import { useAvatarControls } from "../../../hooks/useAvatarControls";
 import { AvatarType } from "../../../components/AvatarSelector";
 import { usePlayer } from "../../../context/PlayerContext";
+import { showRewardAd } from "../../../services/ads";
 
 /** Scene theme: changes each time the game starts. Boxes stay the same; only world (ground, lights, env) changes. */
 export type SceneThemeId =
@@ -42,6 +43,12 @@ const SCENE_THEMES: SceneThemeId[] = [
 function pickRandomTheme(): SceneThemeId {
   return SCENE_THEMES[Math.floor(Math.random() * SCENE_THEMES.length)];
 }
+
+
+// Hint system configuration - easily changeable
+const HINT_DURATION_SECONDS = 10; // Duration hint stays active (in seconds)
+const INITIAL_HINT_COUNT = 1; // Free hints player starts with
+const HINTS_PER_AD = 2; // Number of hints earned per ad watch
 
 interface AlphabetFinderGameProps {
   avatar: AvatarType;
@@ -76,8 +83,16 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
   const [gameStarted, setGameStarted] = useState(false);
   const [hasPlayerMoved, setHasPlayerMoved] = useState(false);
   const initialAvatarPosition = useRef<[number, number, number]>([0, 0, -20]);
+  const initialFollowerPosition = useRef<[number, number, number]>([0, 0, -30]);
   const [followerPosition, setFollowerPosition] = useState<[number, number, number]>([0, 0, -30]);
   const [avatarRotation, setAvatarRotation] = useState<number>(0);
+
+  // Hint system state
+  const [isHintActive, setIsHintActive] = useState(false);
+  const [hintedItemId, setHintedItemId] = useState<string | null>(null);
+  const [hintCount, setHintCount] = useState<number>(INITIAL_HINT_COUNT); // Available hints
+  const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isPaused, setIsPaused] = useState(false); // Game pause state for ads
 
   // Get current content based on mode
   const currentContent = getContentForMode(currentMode);
@@ -125,24 +140,33 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
     setGameStarted(true);
     setHasPlayerMoved(false);
     initialAvatarPosition.current = [0, 0, -20];
+    initialFollowerPosition.current = [0, 0, -30]; // Store initial follower position
     setFollowerPosition([0, 0, -30]);
     setAvatarRotation(0);
+    // Reset hint count when game starts
+    setHintCount(INITIAL_HINT_COUNT);
+    setIsHintActive(false);
+    setHintedItemId(null);
+    if (hintTimerRef.current) {
+      clearTimeout(hintTimerRef.current);
+      hintTimerRef.current = null;
+    }
     playBackgroundMusic();
   }, []);
 
   // Track avatar position changes to detect when player starts moving
   useEffect(() => {
     if (!gameStarted) return;
-    
+
     const [initX, , initZ] = initialAvatarPosition.current;
     const [currX, , currZ] = avatarPosition;
-    
+
     // Check if player has moved from initial position (threshold of 0.5 units)
     const distance = Math.sqrt(
-      Math.pow(currX - initX, 2) + 
+      Math.pow(currX - initX, 2) +
       Math.pow(currZ - initZ, 2)
     );
-    
+
     if (distance > 0.5 && !hasPlayerMoved) {
       setHasPlayerMoved(true);
     }
@@ -247,8 +271,17 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
       // setShowRoundOverlay(true);
       setGameOver(false);
       setFollowerDistance(null);
+      initialFollowerPosition.current = [0, 0, -30]; // Update initial follower position
       setFollowerPosition([0, 0, -30]);
       setAvatarRotation(0);
+      // Reset hint count
+      setHintCount(INITIAL_HINT_COUNT);
+      setIsHintActive(false);
+      setHintedItemId(null);
+      if (hintTimerRef.current) {
+        clearTimeout(hintTimerRef.current);
+        hintTimerRef.current = null;
+      }
       stopAllAudio();
       playBackgroundMusic();
     }
@@ -294,8 +327,17 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
     setShuffleKey(prev => prev + 1);
     setSceneTheme("jungle");
     setRoundNumber(prev => prev + 1);
+    initialFollowerPosition.current = [0, 0, -30]; // Update initial follower position
     setFollowerPosition([0, 0, -30]);
     setAvatarRotation(0);
+    // Reset hint count
+    setHintCount(INITIAL_HINT_COUNT);
+    setIsHintActive(false);
+    setHintedItemId(null);
+    if (hintTimerRef.current) {
+      clearTimeout(hintTimerRef.current);
+      hintTimerRef.current = null;
+    }
     // setShowRoundOverlay(true);
     stopAllAudio();
     playBackgroundMusic();
@@ -306,20 +348,158 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
     setStarPosition(null);
   };
 
+  // Handle getting more hints via ad
+  const handleGetMoreHints = useCallback(async () => {
+    if (!gameStarted) return;
+
+    // Pause the game before showing ad
+    setIsPaused(true);
+    stopBackgroundMusic(); // Pause background music during ad
+
+    try {
+      await showRewardAd('hint', {
+        onRewardEarned: () => {
+          // Player watched ad, give them hints
+          setHintCount(prev => prev + HINTS_PER_AD);
+          playPhonicsAudio("", `Great! You earned ${HINTS_PER_AD} hints!`);
+          // Resume game after ad - reset follower to initial position when game started
+          playerinitialState()
+          setIsPaused(false);
+          playBackgroundMusic();
+        },
+        onAdError: (error) => {
+          console.error('Ad error:', error);
+          playPhonicsAudio("", "Sorry, ad couldn't load. Try again later.");
+          // Resume game even if ad failed - reset follower to initial position when game started
+          playerinitialState()
+          setIsPaused(false);
+          playBackgroundMusic();
+        },
+      });
+    } catch (error) {
+      console.error('Error showing ad:', error);
+      playPhonicsAudio("", "Sorry, couldn't load ad. Try again later.");
+      // Resume game if error occurred - reset follower to initial position when game started
+      playerinitialState()
+      setIsPaused(false);
+      playBackgroundMusic();
+    }
+  }, [gameStarted]);
+
+  const playerinitialState = () => {
+    setAvatarPosition([0, 0, -20]);
+    initialAvatarPosition.current = [0, 0, -20];
+    initialFollowerPosition.current = [0, 0, -30]; // Update initial follower position
+    setFollowerPosition([0, 0, -30]);
+  }
+
+  // Handle hint activation
+  const handleActivateHint = useCallback(async () => {
+    if (!promptItem || !gameStarted) return;
+
+    // Check if player has hints available
+    if (hintCount <= 0) {
+      // No hints left, show ad to get more
+      // Pause the game before showing ad
+      setIsPaused(true);
+      stopBackgroundMusic(); // Pause background music during ad
+
+      try {
+        await showRewardAd('hint', {
+          onRewardEarned: () => {
+            // Player watched ad, give them hints
+            setHintCount(prev => prev + HINTS_PER_AD);
+            playPhonicsAudio("", `Great! You earned ${HINTS_PER_AD} hints!`);
+            // Resume game after ad - reset follower to initial position when game started
+            setIsPaused(false);
+            setFollowerPosition([...initialFollowerPosition.current]);
+            playBackgroundMusic();
+          },
+          onAdError: (error) => {
+            console.error('Ad error:', error);
+            playPhonicsAudio("", "Sorry, ad couldn't load. Try again later.");
+            // Resume game even if ad failed - reset follower to initial position when game started
+            setIsPaused(false);
+            setFollowerPosition([...initialFollowerPosition.current]);
+            playBackgroundMusic();
+          },
+        });
+        // After ad, don't auto-activate hint - let player click again
+        return;
+      } catch (error) {
+        console.error('Error showing ad:', error);
+        playPhonicsAudio("", "Sorry, couldn't load ad. Try again later.");
+        // Resume game if error occurred - reset follower to initial position when game started
+        setIsPaused(false);
+        setFollowerPosition([...initialFollowerPosition.current]);
+        playBackgroundMusic();
+        return;
+      }
+    }
+
+    // Player has hints, use one
+    setHintCount(prev => prev - 1);
+
+    // Clear any existing hint timer
+    if (hintTimerRef.current) {
+      clearTimeout(hintTimerRef.current);
+      hintTimerRef.current = null;
+    }
+
+    // Activate hint for the current prompt item
+    setIsHintActive(true);
+    setHintedItemId(promptItem.id);
+
+    // Play hint audio
+    playPhonicsAudio("", `Hint: Look for the letter ${promptItem.label}`);
+
+    // Auto-disable hint after configured duration
+    hintTimerRef.current = setTimeout(() => {
+      setIsHintActive(false);
+      setHintedItemId(null);
+      hintTimerRef.current = null;
+    }, HINT_DURATION_SECONDS * 1000);
+  }, [promptItem, gameStarted, hintCount]);
+
+  // Cleanup hint timer on unmount or when prompt changes
+  useEffect(() => {
+    return () => {
+      if (hintTimerRef.current) {
+        clearTimeout(hintTimerRef.current);
+        hintTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Reset hint when prompt item changes (but keep hint count)
+  useEffect(() => {
+    setIsHintActive(false);
+    setHintedItemId(null);
+    if (hintTimerRef.current) {
+      clearTimeout(hintTimerRef.current);
+      hintTimerRef.current = null;
+    }
+  }, [promptItem?.id]);
+
   // Handle back button - stop all audio before navigating
   const handleBack = () => {
+    // Cleanup hint timer
+    if (hintTimerRef.current) {
+      clearTimeout(hintTimerRef.current);
+      hintTimerRef.current = null;
+    }
     onBack();
   };
 
   // Handle touch gestures from swipe controls
   // For "up" (forward), we'll handle continuous movement in the scene component
   // For left/right/down, these are quick direction changes
-  const touchGestureRef = useRef<{ 
-    action: "up" | "down" | "left" | "right" | null; 
+  const touchGestureRef = useRef<{
+    action: "up" | "down" | "left" | "right" | null;
     timeout: ReturnType<typeof setTimeout> | null;
     isHolding: boolean;
   }>({ action: null, timeout: null, isHolding: false });
-  
+
   const handleTouchGesture = useCallback((action: "up" | "down" | "left" | "right") => {
     if (!gameStarted) return;
     // Clear any existing timeout
@@ -383,11 +563,11 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
   const themeSky = THEME_CONFIG[sceneTheme];
   const skyStyle = themeSky.skyGradient
     ? {
-        background: `linear-gradient(to bottom, ${themeSky.skyGradient.from}, ${themeSky.skyGradient.to})`,
-      }
+      background: `linear-gradient(to bottom, ${themeSky.skyGradient.from}, ${themeSky.skyGradient.to})`,
+    }
     : {
-        backgroundColor: themeSky.skyColor,
-      };
+      backgroundColor: themeSky.skyColor,
+    };
 
   return (
     <div className="w-full h-screen overflow-hidden" style={skyStyle}>
@@ -454,22 +634,33 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
             onAvatarPositionChange={setAvatarPosition}
             direction={direction}
             rotationDirection={rotationDirection}
-          isMoving={isMoving}
-          onTouchGesture={isMobile ? handleTouchGesture : undefined}
-          onGameOver={handleGameOver}
-          enableFollower={hasPlayerMoved}
-          onFollowerDistanceChange={handleFollowerDistanceChange}
-          isGameActive={!showRoundOverlay && !gameOver}
-          onFollowerPositionChange={setFollowerPosition}
-          onAvatarRotationChange={setAvatarRotation}
-        />
+            isMoving={isMoving}
+            onTouchGesture={isMobile ? handleTouchGesture : undefined}
+            onGameOver={handleGameOver}
+            enableFollower={hasPlayerMoved}
+            onFollowerDistanceChange={handleFollowerDistanceChange}
+            isGameActive={!showRoundOverlay && !gameOver && !isPaused}
+            onFollowerPositionChange={setFollowerPosition}
+            onAvatarRotationChange={setAvatarRotation}
+            hintedItemId={hintedItemId}
+            isHintActive={isHintActive}
+          />
         </div>
       )}
 
       {/* Prompt Display */}
       {currentMode === "alphabet" && (
         <>
-          <PromptDisplay promptItem={promptItem} score={score} playerName={playerName} />
+          <PromptDisplay
+            promptItem={promptItem}
+            score={score}
+            playerName={playerName}
+            onHintClick={handleActivateHint}
+            onGetMoreHints={handleGetMoreHints}
+            isHintActive={isHintActive}
+            hintCount={hintCount}
+            gameStarted={gameStarted}
+          />
 
           {/* Progress Numbers */}
           <div className={`absolute ${isMobile ? 'bottom-2 left-2 right-2' : 'bottom-4 left-1/2 transform -translate-x-1/2'} z-30`}>
@@ -541,7 +732,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
       {gameStarted && !gameOver && !showRoundOverlay && (
         <div
           className={`absolute z-30 right-3 ${isMobile ? "" : "bottom-24"}`}
-          style={isMobile ? { bottom: "calc(max(1rem, env(safe-area-inset-bottom, 0px) + 0.5rem) + 4rem)" } : undefined}
+          style={isMobile ? { bottom: "calc(max(1rem, env(safe-area-inset-bottom, 0px) + 0.5rem) + 3rem)" } : undefined}
         >
           <div className="bg-black/80 backdrop-blur-sm rounded-xl shadow-lg border border-white/20 p-2">
             <div className={`${isMobile ? "w-24 h-24" : "w-32 h-32"} relative`}>
@@ -560,7 +751,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
                   stroke="rgba(255, 255, 255, 0.3)"
                   strokeWidth="0.5"
                 />
-                
+
                 {/* Follower */}
                 <circle
                   cx={followerPosition[0]}
@@ -571,7 +762,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
                   strokeWidth="0.5"
                   opacity="0.9"
                 />
-                
+
                 {/* Avatar */}
                 <circle
                   cx={avatarPosition[0]}
@@ -581,7 +772,7 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
                   stroke="#ffffff"
                   strokeWidth="1"
                 />
-                
+
                 {/* Avatar direction indicator */}
                 <line
                   x1={avatarPosition[0]}
@@ -637,19 +828,19 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
           className={getButtonClasses(isMobile ? 'sm' : 'md', `flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`)}
           aria-label="Back"
         >
-          {!isMobile && <span>Back</span>}
+          <span className={isMobile ? 'text-xs' : ''}>Back</span>
         </button>
         <button
           onClick={handleResetGame}
           className={getButtonClasses(isMobile ? 'sm' : 'md', `flex items-center ${isMobile ? 'gap-1' : 'gap-2'}`)}
           aria-label="Reset Game"
         >
-          {!isMobile && <span>Reset</span>}
+          <span className={isMobile ? 'text-xs' : ''}>Reset</span>
         </button>
       </div>
 
       {/* Change View Button - Bottom Right */}
-      <div className={`absolute ${isMobile ? 'bottom-24 right-3' : 'bottom-6 right-4'} z-30`}>
+      <div className={`absolute ${isMobile ? 'bottom-56 right-3' : 'bottom-6 right-4'} z-30`}>
         <button
           onClick={handleChangeTheme}
           className={getButtonClasses(isMobile ? 'w-14 h-14' : 'md', `flex items-center justify-center ${isMobile ? '' : 'gap-2'}`)}
@@ -663,9 +854,9 @@ export function AlphabetFinderGame({ avatar, onBack, onGameComplete }: AlphabetF
 
       {/* Logo - Top Center */}
       <div className={`absolute ${isMobile ? 'top-2' : 'top-4'} left-1/2 transform -translate-x-1/2 z-50`}>
-        <img 
-          src="/logo.png" 
-          alt="Khel Town Logo" 
+        <img
+          src="/logo.png"
+          alt="Khel Town Logo"
           className={`${isMobile ? 'h-6' : 'h-8'} w-auto object-contain opacity-60 hover:opacity-100 transition-opacity duration-200`}
         />
       </div>

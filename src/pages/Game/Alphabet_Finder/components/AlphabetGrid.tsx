@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { Text } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
 import { LearningItem } from "../../../../data/types";
+import * as THREE from "three";
 
 interface AlphabetGridProps {
   items: LearningItem[];
@@ -9,9 +11,11 @@ interface AlphabetGridProps {
   avatarPosition: [number, number, number];
   shuffleKey?: number; // Key to force reshuffle on reset
   onBoxPositionUpdate?: (positions: Map<string, [number, number, number]>) => void;
+  hintedItemId?: string | null; // ID of the item currently being hinted
+  isHintActive?: boolean; // Whether hint is currently active
 }
 
-export function AlphabetGrid({ items, onItemClick, completedItems, avatarPosition, shuffleKey = 0, onBoxPositionUpdate }: AlphabetGridProps) {
+export function AlphabetGrid({ items, onItemClick, completedItems, avatarPosition, shuffleKey = 0, onBoxPositionUpdate, hintedItemId = null, isHintActive = false }: AlphabetGridProps) {
   // Create a grid layout - 6x6 grid for 26 letters (with 10 empty spaces)
   const gridSize = 6;
 
@@ -109,6 +113,7 @@ export function AlphabetGrid({ items, onItemClick, completedItems, avatarPositio
             onClick={() => onItemClick(item, [x, boxYPosition, z])}
             avatarPosition={avatarPosition}
             isCompleted={false}
+            isHinted={isHintActive && hintedItemId === item.id}
           />
         );
       })}
@@ -122,9 +127,10 @@ interface AlphabetBoxProps {
   onClick: () => void;
   avatarPosition: [number, number, number];
   isCompleted?: boolean;
+  isHinted?: boolean; // Whether this box is currently being hinted
 }
 
-function AlphabetBox({ item, position, onClick, avatarPosition, isCompleted = false }: AlphabetBoxProps) {
+function AlphabetBox({ item, position, onClick, avatarPosition, isCompleted = false, isHinted = false }: AlphabetBoxProps) {
   // Calculate distance from avatar to box
   const distance = Math.sqrt(
     Math.pow(position[0] - avatarPosition[0], 2) +
@@ -150,10 +156,36 @@ function AlphabetBox({ item, position, onClick, avatarPosition, isCompleted = fa
   const opacity = 1;
   const scale = 1;
 
+  // Hint animation refs
+  const hintPulseRef = useRef(0);
+  const hintGlowRef = useRef<THREE.Mesh>(null);
+  const hintRingRef = useRef<THREE.Mesh>(null);
+
+  // Animate hint glow effect
+  useFrame(() => {
+    if (isHinted) {
+      hintPulseRef.current += 0.15;
+      const pulse = Math.sin(hintPulseRef.current) * 0.3 + 0.7; // Pulse between 0.4 and 1.0
+      
+      if (hintGlowRef.current) {
+        const material = hintGlowRef.current.material as THREE.MeshStandardMaterial;
+        material.emissiveIntensity = pulse * 1.5;
+      }
+      
+      if (hintRingRef.current) {
+        const scale = 1 + Math.sin(hintPulseRef.current * 2) * 0.3;
+        hintRingRef.current.scale.set(scale, scale, scale);
+        const material = hintRingRef.current.material as THREE.MeshStandardMaterial;
+        material.opacity = pulse * 0.8;
+      }
+    }
+  });
+
   return (
     <group position={position} scale={scale}>
       {/* Box with letter on all sides */}
       <mesh
+        ref={hintGlowRef}
         onClick={handleClick}
         onPointerOver={(e) => {
           e.stopPropagation();
@@ -168,15 +200,56 @@ function AlphabetBox({ item, position, onClick, avatarPosition, isCompleted = fa
         <boxGeometry args={[3.5, 3.5, 3.5]} />
         <meshStandardMaterial
           color={item.color}
-          emissive={item.color}
-          emissiveIntensity={isNear ? 0.5 : 0.2}
+          emissive={isHinted ? "#00ff00" : item.color}
+          emissiveIntensity={isHinted ? 1.2 : (isNear ? 0.5 : 0.2)}
           transparent
           opacity={opacity}
         />
       </mesh>
 
-      {/* Proximity indicator - glow when near */}
-      {isNear && (
+      {/* Hint indicator - bright pulsing green glow when hinted */}
+      {isHinted && (
+        <>
+          {/* Large pulsing ring around box */}
+          <mesh ref={hintRingRef} position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[2.5, 3.5, 32]} />
+            <meshStandardMaterial
+              color="#00ff00"
+              emissive="#00ff00"
+              emissiveIntensity={2}
+              transparent
+              opacity={0.8}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          {/* Vertical pulsing rings */}
+          <mesh position={[0, 1.75, 0]} rotation={[0, 0, 0]}>
+            <ringGeometry args={[2.2, 2.8, 32]} />
+            <meshStandardMaterial
+              color="#00ff00"
+              emissive="#00ff00"
+              emissiveIntensity={1.5}
+              transparent
+              opacity={0.7}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          <mesh position={[0, -1.75, 0]} rotation={[0, 0, 0]}>
+            <ringGeometry args={[2.2, 2.8, 32]} />
+            <meshStandardMaterial
+              color="#00ff00"
+              emissive="#00ff00"
+              emissiveIntensity={1.5}
+              transparent
+              opacity={0.7}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        </>
+      )}
+
+      {/* Proximity indicator - glow when near (only show if not hinted) */}
+      {isNear && !isHinted && (
         <mesh position={[0, 2, 0]}>
           <ringGeometry args={[2, 2.3, 16]} />
           <meshStandardMaterial

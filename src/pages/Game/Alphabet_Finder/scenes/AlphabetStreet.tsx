@@ -191,6 +191,9 @@ interface AlphabetStreetProps {
   isGameActive?: boolean; // Whether game is active (not in overlay)
   onFollowerPositionChange?: (position: [number, number, number]) => void; // Report follower position for minimap
   onAvatarRotationChange?: (rotation: number) => void; // Report avatar rotation for minimap
+  // Hint system
+  hintedItemId?: string | null; // ID of the item currently being hinted
+  isHintActive?: boolean; // Whether hint is currently active
 }
 
 export function AlphabetStreet({
@@ -224,6 +227,8 @@ export function AlphabetStreet({
   isGameActive = true,
   onFollowerPositionChange,
   onAvatarRotationChange,
+  hintedItemId = null,
+  isHintActive = false,
 }: AlphabetStreetProps) {
   const themeConfig = THEME_CONFIG[sceneTheme];
   // Navigation management - use external controls if provided, otherwise use internal hook
@@ -878,6 +883,8 @@ export function AlphabetStreet({
         avatarPosition={avatarPosition || [0, 0, -20]}
         onBoxPositionUpdate={onBoxPositionsUpdate}
         shuffleKey={shuffleKey}
+        hintedItemId={hintedItemId}
+        isHintActive={isHintActive}
       />
 
       {/* 3D Avatar */}
